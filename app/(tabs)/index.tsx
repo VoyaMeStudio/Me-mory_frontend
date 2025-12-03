@@ -60,7 +60,7 @@ export default function HomeScreen() {
           </Link.Menu>
         </Link>
 
-        <ThemedText>
+        <ThemedText  style={{ fontFamily: 'Nanum', fontSize: 24 }}>
           {`Tap the Explore tab to learn more about what's included in this starter app.`}
         </ThemedText>
       </ThemedView>
