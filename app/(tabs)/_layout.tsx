@@ -1,35 +1,30 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
-
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { GnbTab, GnbTabBar } from "@/components/common/GnbTabBar";
+import { Tabs } from "expo-router";
+import React from "react";
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+
+  const [activeTab, setActiveTab] = React.useState<GnbTab>("home");
+
+  const handleTabPress = (tab: GnbTab) => {
+    setActiveTab(tab);
+  };
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />
+        tabBarStyle: { display: "none" }, 
+      }}
+
+      tabBar={() => (
+        <GnbTabBar activeTab={activeTab} onTabPress={handleTabPress} />
+      )}
+    >
+
+      <Tabs.Screen name="home" options={{ title: "홈" }} />
+      <Tabs.Screen name="record" options={{ title: "기록하기" }} />
+      <Tabs.Screen name="board" options={{ title: "보드" }} />
     </Tabs>
   );
 }
