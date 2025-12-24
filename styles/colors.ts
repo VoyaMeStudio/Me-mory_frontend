@@ -2,14 +2,14 @@
 export const Colors = {
   /** ----------------------- Primary ----------------------- **/
   primary50:  "#FEFEFE",
-  primary100: "#F8F8F4",
+  primary100: "#F4F0EA",
   primary150: "#F5F2EB",
   primary200: "#F0EAE1",
   primary250: "#E9E1D3",
   primary300: "#E1D7C3",
   primary400: "#C6B9A5",
   primary500: "#AFA38F",
-  primary600: "#8B807A",
+  primary600: "#3F3A32",
   primary700: "#827765",
   primary800: "#6B6252",
   primary900: "#544C3F",
