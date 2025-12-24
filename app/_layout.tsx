@@ -12,7 +12,7 @@ export default function RootLayout() {
 
   // 폰트 로드(테스트용으로 필요 시 수정해주시면 됩니다)
   const [loaded] = useFonts({
-    Nanum: require('../assets/fonts/나눔손글씨_느릿느릿체.ttf'),
+    Nanum: require('../assets/fonts/NanumSlow.ttf'),
   });
 
   // 폰트 로딩 안될 시 null 반환
@@ -22,9 +22,9 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack initialRouteName="index" screenOptions={{ headerShown: false }}>
-         <Stack.Screen name="index" />
-         <Stack.Screen name="(auth)" />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>

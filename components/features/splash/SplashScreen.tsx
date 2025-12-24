@@ -1,23 +1,42 @@
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
-import { Text, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 
 export default function SplashScreen() {
   const router = useRouter();
 
-  useEffect(function handleAutoMove() {
-    const timeoutId = setTimeout(function moveToOnboarding() {
+  useEffect(() => {
+    //if (__DEV__) return; // 개발 중 고정
+    const t = setTimeout(() => {
       router.replace('/(auth)/onboarding/step-1');
     }, 1000);
-
-    return function cleanup() {
-      clearTimeout(timeoutId);
-    };
+    return () => clearTimeout(t);
   }, [router]);
 
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ fontSize: 22, fontWeight: '600' }}>Splash</Text>
+    <View style={styles.container}>
+      <Image
+         source={require('@/assets/images/logo&slogan.png')}
+        style={styles.group}
+        resizeMode="contain"
+      />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F1E8', 
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  group: {
+    width: 195,
+    height: 179,
+    transform: [{ translateY: -30 }], 
+  },
+});
+
+
+       
