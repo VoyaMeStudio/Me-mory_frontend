@@ -1,7 +1,14 @@
 import OnboardingProgress from '@/components/features/onboarding/OnboardingProgress';
 import { Colors } from '@/styles/colors';
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 
 type Step2Props = {
   onNext: () => void;
@@ -10,14 +17,37 @@ type Step2Props = {
 
 export default function OnboardingStep2Screen({ onNext }: Step2Props) {
   const BASE_INDEX = 1;
+  const { width: W, height: H } = useWindowDimensions();
 
   function handleNext() {
     onNext();
   }
 
+  const routeWidth = W * 1.1;
+  const routeHeight = H * 1.1;
+
+  const shiftX = -W * 0.08;
+  const shiftY = H * 0.03;  
   return (
     <View style={styles.container}>
       <View style={styles.bg} />
+
+      <View pointerEvents="none" style={styles.routeClip}>
+        <Image
+          source={require('@/assets/images/route2.png')}
+          resizeMode="contain"
+          style={{
+            width: routeWidth,
+            height: routeHeight,
+            opacity: 1,
+            transform: [
+              { translateX: shiftX },
+              { translateY: shiftY },
+            ],
+          }}
+        />
+      </View>
+
       <View style={styles.bgOverlay} />
 
       <View style={styles.centerWrap}>
@@ -51,6 +81,7 @@ export default function OnboardingStep2Screen({ onNext }: Step2Props) {
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
@@ -63,6 +94,15 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: Colors.primary150,
     opacity: 0.22,
+    zIndex: 0,
+  },
+
+  routeClip: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
   },
 
   centerWrap: {
@@ -71,6 +111,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 24,
     paddingTop: 55,
+    zIndex: 2,
   },
 
   title: {
@@ -102,21 +143,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary100,
   },
 
-  topImage: {
-    width: '100%',
-    height: '50%',
-  },
-
-  bottomImage: {
-    width: '100%',
-    height: '50%',
-  },
+  topImage: { width: '100%', height: '50%' },
+  bottomImage: { width: '100%', height: '50%' },
 
   bottomWrap: {
     paddingHorizontal: 24,
     paddingBottom: 28,
     marginBottom: 12,
     gap: 16,
+    zIndex: 2,
   },
 
   nextButton: {
