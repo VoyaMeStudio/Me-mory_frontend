@@ -24,7 +24,6 @@ export default function OnboardingScreen() {
 
   const finish = useCallback(async () => {
     await AsyncStorage.setItem('hasOnboarded', 'true');
-    router.replace('/(auth)/login');
   }, [router]);
 
   useFocusEffect(
