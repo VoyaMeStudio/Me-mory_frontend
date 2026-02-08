@@ -1,27 +1,32 @@
 import { Platform, StyleSheet } from "react-native";
 
-const FONT={
-    regular: "Nanum",
-}
+const FONT = {
+  nanum: "Nanum",
+  pretendard: "Pretendard",
+};
+
 export const typography = StyleSheet.create({
   /** ----------------------- Head ----------------------- **/
   head1_28_regular: {
-    fontFamily: FONT.regular,
+    fontFamily: FONT.nanum,
     fontSize: 28,
     fontWeight: "400",
     lineHeight: 28,
+    letterSpacing: -0.28,
   },
   head1_28_bold: {
-    fontFamily: FONT.regular,
-    fontSize: 28,
-    fontWeight: "400", 
-    lineHeight: 28,
-  },
-  head1_28_bold_stroke: {
-    fontFamily: FONT.regular,
+    fontFamily: FONT.nanum,
     fontSize: 28,
     fontWeight: "700",
     lineHeight: 28,
+    letterSpacing: -0.28,
+  },
+  head1_28_bold_stroke: {
+    fontFamily: FONT.nanum,
+    fontSize: 28,
+    fontWeight: "700",
+    lineHeight: 28,
+    letterSpacing: -0.28,
     ...(Platform.OS === "ios" && {
       textShadowColor: "#000",
       textShadowRadius: 0.1,
@@ -30,16 +35,18 @@ export const typography = StyleSheet.create({
   },
 
   head2_26_regular: {
-    fontFamily: FONT.regular,
+    fontFamily: FONT.nanum,
     fontSize: 26,
     fontWeight: "400",
     lineHeight: 26,
+    letterSpacing: -0.26,
   },
   head2_26_bold_stroke: {
-    fontFamily: FONT.regular,
+    fontFamily: FONT.nanum,
     fontSize: 26,
     fontWeight: "700",
     lineHeight: 26,
+    letterSpacing: -0.26,
     ...(Platform.OS === "ios" && {
       textShadowColor: "#000",
       textShadowRadius: 0.2,
@@ -48,16 +55,18 @@ export const typography = StyleSheet.create({
   },
 
   head3_24_regular: {
-    fontFamily: FONT.regular,
+    fontFamily: FONT.nanum,
     fontSize: 24,
     fontWeight: "400",
     lineHeight: 24,
+    letterSpacing: -0.24,
   },
   head3_24_bold_stroke: {
-    fontFamily: FONT.regular,
+    fontFamily: FONT.nanum,
     fontSize: 24,
     fontWeight: "700",
     lineHeight: 24,
+    letterSpacing: -0.24,
     ...(Platform.OS === "ios" && {
       textShadowColor: "#000",
       textShadowRadius: 0.2,
@@ -66,58 +75,65 @@ export const typography = StyleSheet.create({
   },
 
   head4_22_regular: {
-    fontFamily: FONT.regular,
+    fontFamily: FONT.nanum,
     fontSize: 22,
     fontWeight: "400",
     lineHeight: 22,
+    letterSpacing: -0.22,
   },
 
   head5_20_regular: {
-    fontFamily: FONT.regular,
+    fontFamily: FONT.nanum,
     fontSize: 20,
     fontWeight: "400",
     lineHeight: 20,
+    letterSpacing: -0.2,
   },
 
   head6_18_regular: {
-    fontFamily: FONT.regular,
+    fontFamily: FONT.nanum,
     fontSize: 18,
     fontWeight: "400",
     lineHeight: 18,
+    letterSpacing: -0.18,
   },
 
   /** ----------------------- Body ----------------------- **/
   body1_20_regular: {
-    fontFamily: FONT.regular,
+    fontFamily: FONT.nanum,
     fontSize: 20,
     fontWeight: "400",
     lineHeight: 24,
+    letterSpacing: -0.2,
   },
 
   body2_18_regular: {
-    fontFamily: FONT.regular,
+    fontFamily: FONT.nanum,
     fontSize: 18,
     fontWeight: "400",
     lineHeight: 20,
+    letterSpacing: -0.18,
   },
 
   body3_16_regular: {
-    fontFamily: FONT.regular,
+    fontFamily: FONT.nanum,
     fontSize: 16,
     fontWeight: "400",
     lineHeight: 20,
+    letterSpacing: -0.16,
   },
 
   body4_14_regular: {
-    fontFamily: FONT.regular,
+    fontFamily: FONT.nanum,
     fontSize: 14,
     fontWeight: "400",
     lineHeight: 20,
+    letterSpacing: -0.14,
   },
 
   /** ----------------------- Sub ----------------------- **/
   sub1_14_medium: {
-    fontFamily: FONT.regular,
+    fontFamily: FONT.nanum,
     fontSize: 14,
     fontWeight: "500",
     lineHeight: 16,
@@ -125,7 +141,7 @@ export const typography = StyleSheet.create({
   },
 
   sub2_12_regular: {
-    fontFamily: FONT.regular,
+    fontFamily: FONT.nanum,
     fontSize: 12,
     fontWeight: "400",
     lineHeight: 14,
@@ -133,7 +149,7 @@ export const typography = StyleSheet.create({
   },
 
   sub3_9_bold: {
-    fontFamily: FONT.regular,
+    fontFamily: FONT.nanum,
     fontSize: 9,
     fontWeight: "700",
     lineHeight: 12,

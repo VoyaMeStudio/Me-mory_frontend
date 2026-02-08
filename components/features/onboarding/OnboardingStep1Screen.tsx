@@ -1,7 +1,9 @@
 import OnboardingProgress from '@/components/features/onboarding/OnboardingProgress';
 import { Colors } from '@/styles/colors';
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
+import PaperStep1 from '@/assets/images/paper_step1.svg';
 
 type Step1Props = {
   onNext: () => void;
@@ -20,11 +22,7 @@ export default function OnboardingStep1Screen({ onNext }: Step1Props) {
       <View style={styles.bgOverlay} />
 
       <View style={styles.centerWrap}>
-        <Image
-          source={require('@/assets/images/paper_step1.png')}
-          style={styles.paper}
-          resizeMode="contain"
-        />
+        <PaperStep1 width="88%" height={420} />
 
         <View style={styles.paperTextBox} pointerEvents="none">
           <Text style={styles.paperText}>
