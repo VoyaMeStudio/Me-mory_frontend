@@ -1,7 +1,14 @@
 import OnboardingProgress from '@/components/features/onboarding/OnboardingProgress';
 import { Colors } from '@/styles/colors';
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 
 type Step1Props = {
   onNext: () => void;
@@ -9,14 +16,36 @@ type Step1Props = {
 
 export default function OnboardingStep1Screen({ onNext }: Step1Props) {
   const BASE_INDEX = 0;
+  const { width: W, height: H } = useWindowDimensions();
 
   function handleNext() {
     onNext();
   }
 
+  const routeWidth = W * 1.1;
+  const routeHeight = H * 1.1;
+
+  const routeLeft = -W * 0.05;
+  const routeTop = H * 0.01;
+
   return (
     <View style={styles.container}>
       <View style={styles.bg} />
+      <View pointerEvents="none" style={styles.routeLayer}>
+        <Image
+          source={require('@/assets/images/route.png')}
+          resizeMode="contain"
+          style={{
+            position: 'absolute',
+            width: routeWidth,
+            height: routeHeight,
+            left: routeLeft,
+            top: routeTop,
+            opacity: 1,
+          }}
+        />
+      </View>
+
       <View style={styles.bgOverlay} />
 
       <View style={styles.centerWrap}>
@@ -58,7 +87,13 @@ const styles = StyleSheet.create({
   bgOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: Colors.primary150,
-    opacity: 0.22,
+    opacity: 0.18,
+    zIndex: 0,
+  },
+
+  routeLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
   },
 
   centerWrap: {
@@ -66,6 +101,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
+    zIndex: 2, 
   },
 
   paper: {
@@ -97,6 +133,7 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     marginBottom: 12,
     gap: 16,
+    zIndex: 2,
   },
 
   nextButton: {
