@@ -1,5 +1,19 @@
 import OnboardingProgress from '@/components/features/onboarding/OnboardingProgress';
 import { Colors } from '@/styles/colors';
+
+import React, { memo } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
+import Card1 from '@/assets/images/card1.svg';
+import Card2 from '@/assets/images/card2.svg';
+
+const Card1Memo = memo((props: { w: number; h: number }) => (
+  <Card1 width={props.w} height={props.h} />
+));
+const Card2Memo = memo((props: { w: number; h: number }) => (
+  <Card2 width={props.w} height={props.h} />
+));
+
 import React from 'react';
 import {
   Image,
@@ -9,6 +23,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+
 
 type Step3Props = {
   onNext: () => void;
@@ -56,19 +71,11 @@ export default function OnboardingStep3Screen({ onNext }: Step3Props) {
 
         <View style={styles.cardWrap}>
           <View style={styles.card}>
-            <Image
-              source={require('@/assets/images/card1.png')}
-              style={styles.cardImage}
-              resizeMode="contain"
-            />
+            <Card1Memo w={CARD_W} h={CARD_H} />
           </View>
 
           <View style={styles.card}>
-            <Image
-              source={require('@/assets/images/card2.png')}
-              style={styles.cardImage}
-              resizeMode="contain"
-            />
+           <Card2Memo w={CARD_W} h={CARD_H} />
           </View>
         </View>
       </View>
@@ -109,9 +116,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     paddingHorizontal: 24,
+
+    paddingTop: 200,
+
     paddingTop: 100,
     transform: [{ translateY: 100 }],
     zIndex: 2,
+
   },
 
   title: {

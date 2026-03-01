@@ -1,37 +1,72 @@
 import OnboardingProgress from '@/components/features/onboarding/OnboardingProgress';
+import { useAuth } from '@/context/authContext';
 import { Colors } from '@/styles/colors';
 import { useRouter } from 'expo-router';
-import React, { useMemo } from 'react';
-import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Dimensions,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+
+import Travel1 from '@/assets/images/travel_1.svg';
+import Travel2 from '@/assets/images/travel_2.svg';
+import Travel3 from '@/assets/images/travel_3.svg';
+import Travel4 from '@/assets/images/travel_4.svg';
+import Travel5 from '@/assets/images/travel_5.svg';
+import Travel6 from '@/assets/images/travel_6.svg';
+
+import KakaoIcon from '@/assets/images/kakao.svg';
 
 type Step4Props = {
   onFinish: () => void;
   onPrev: () => void;
 };
 
-export default function OnboardingStep4Screen({ onFinish, onPrev }: Step4Props) {
+const PAD = 8;
+const Travels = [Travel1, Travel2, Travel3, Travel4, Travel5, Travel6];
+
+export default function OnboardingStep4Screen({ onFinish }: Step4Props) {
   const router = useRouter();
+  const { checkAuth } = useAuth();
   const BASE_INDEX = 3;
 
-  const { gridW, cardW, cardH } = useMemo(() => {
+  const [loading, setLoading] = useState(false);
+
+  const { gridW, cardW, cardH, innerW, innerH, gap } = useMemo(() => {
     const screenW = Dimensions.get('window').width;
 
-    const H_PADDING = 24;
-    const MAX_GRID_W = 360;
-    const gridW = Math.min(screenW - H_PADDING * 2, MAX_GRID_W);
+    const H_PADDING = 20;
 
-    const COLUMN_GAP = 8;
-    const cardW = Math.floor((gridW - COLUMN_GAP * 2) / 3);
+    const gridW = screenW - H_PADDING * 2;
 
+    const gap = 3;
+
+    const cardW = Math.floor((gridW - gap * 2) / 3);
     const cardH = Math.floor(cardW * 1.58);
 
-    return { gridW, cardW, cardH };
+    const innerW = cardW - PAD * 2;
+    const innerH = cardH - PAD * 2;
+
+    return { gridW, cardW, cardH, innerW, innerH, gap };
   }, []);
 
-  function handleNext() {
-    router.replace('/(auth)/login');
-  }
+  const withTimeout = <T,>(p: Promise<T>, ms = 15000) =>
+    Promise.race<T>([
+      p,
+      new Promise<T>((_, rej) =>
+        setTimeout(() => rej(new Error(`TIMEOUT ${ms}ms`)), ms),
+      ),
+    ]);
 
+  const handleKakaoStart=()=>{
+    if(loading) return;
+    router.push("/(auth)/kakao-webview");
+  };
+  
   return (
     <View style={styles.container}>
       <View style={styles.bg} />
@@ -52,67 +87,34 @@ export default function OnboardingStep4Screen({ onFinish, onPrev }: Step4Props) 
           나만의 기록을 더욱 다채롭게
         </Text>
 
-        <View style={[styles.grid, { width: gridW }]}>
-          <View style={[styles.card, { width: cardW, height: cardH }]}>
-            <Image
-              source={require('@/assets/images/travel_1.png')}
-              style={styles.cardImage}
-              resizeMode="contain"
-            />
-          </View>
-
-          <View style={[styles.card, { width: cardW, height: cardH }]}>
-            <Image
-              source={require('@/assets/images/travel_2.png')}
-              style={styles.cardImage}
-              resizeMode="contain"
-            />
-          </View>
-
-          <View style={[styles.card, { width: cardW, height: cardH }]}>
-            <Image
-              source={require('@/assets/images/travel_3.png')}
-              style={styles.cardImage}
-              resizeMode="contain"
-            />
-          </View>
-
-          <View style={[styles.card, { width: cardW, height: cardH }]}>
-            <Image
-              source={require('@/assets/images/travel_4.png')}
-              style={styles.cardImage}
-              resizeMode="contain"
-            />
-          </View>
-
-          <View style={[styles.card, { width: cardW, height: cardH }]}>
-            <Image
-              source={require('@/assets/images/travel_5.png')}
-              style={styles.cardImage}
-              resizeMode="contain"
-            />
-          </View>
-
-          <View style={[styles.card, { width: cardW, height: cardH }]}>
-            <Image
-              source={require('@/assets/images/travel_6.png')}
-              style={styles.cardImage}
-              resizeMode="contain"
-            />
-          </View>
+        <View style={[styles.grid, { width: gridW, columnGap: gap }]}>
+          {Travels.map((T, idx) => (
+            <View
+              key={idx}
+              style={[
+                styles.card,
+                { width: cardW, height: cardH, padding: PAD },
+              ]}
+            >
+              <T width={innerW} height={innerH} />
+            </View>
+          ))}
         </View>
       </View>
 
       <View style={styles.bottomWrap}>
         <OnboardingProgress total={4} activeIndex={BASE_INDEX} />
 
-        <Pressable style={styles.kakaoButton} onPress={handleNext}>
-          <Image
-            source={require('@/assets/images/kakao.png')}
-            style={styles.kakaoIcon}
-            resizeMode="contain"
-          />
-          <Text style={styles.kakaoButtonText}>카카오로 5초만에 시작하기</Text>
+        <Pressable
+          style={[styles.kakaoButton, loading && styles.kakaoButtonDisabled]}
+          onPress={handleKakaoStart}
+          disabled={loading}
+        >
+          <KakaoIcon width={17} height={16} />
+          <Text style={styles.kakaoButtonText}>
+            카카오로 5초만에 시작하기
+          </Text>
+          {loading && <ActivityIndicator style={{ marginLeft: 8 }} />}
         </Pressable>
       </View>
     </View>
@@ -134,6 +136,7 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
 
+
   routeLayer: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 1,
@@ -148,14 +151,20 @@ const styles = StyleSheet.create({
     opacity: 1,
   },
 
+
   centerWrap: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-start',
+
+    paddingHorizontal: 20,
+    paddingTop: 170,
+
     paddingHorizontal: 24,
     paddingTop: 100,
     transform: [{ translateY: 70 }],
     zIndex: 2,
+
   },
 
   title: {
@@ -172,28 +181,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    columnGap: 8,
-    rowGap: 14,
+    rowGap: 10,
   },
 
   card: {
     borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: Colors.primary100,
-    paddingTop: 8,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-
-  cardImage: {
-    width: '100%',
-    height: '100%',
   },
 
   bottomWrap: {
     paddingHorizontal: 24,
     paddingBottom: 34,
-    marginBottom: 0,
     gap: 16,
     zIndex: 2,
   },
@@ -208,9 +209,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 
-  kakaoIcon: {
-    width: 17,
-    height: 16,
+  kakaoButtonDisabled: {
+    opacity: 0.7,
   },
 
   kakaoButtonText: {

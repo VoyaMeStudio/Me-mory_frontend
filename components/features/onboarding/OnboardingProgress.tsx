@@ -1,7 +1,8 @@
+import PlaneSvg from '@/assets/images/plane.svg';
 import { Colors } from '@/styles/colors';
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Animated, Image, StyleSheet, View } from 'react-native';
+import { Animated, StyleSheet, View } from 'react-native';
 
 type Props = {
   total: number; 
@@ -110,11 +111,7 @@ export default function OnboardingProgress({ activeIndex }: Props) {
           pointerEvents="none"
           style={[styles.planeBox, { transform: [{ translateX: x }] }]}
         >
-          <Image
-            source={require('@/assets/images/plane.png')}
-            style={styles.plane}
-            resizeMode="contain"
-          />
+          <PlaneSvg width={PLANE_W} height={PLANE_H}/>
         </Animated.View>
       </View>
     </View>

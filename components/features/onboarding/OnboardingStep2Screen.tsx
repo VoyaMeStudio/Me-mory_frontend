@@ -1,6 +1,12 @@
 import OnboardingProgress from '@/components/features/onboarding/OnboardingProgress';
 import { Colors } from '@/styles/colors';
 import React from 'react';
+
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
+import Rectangle1 from '@/assets/images/Rectangle_1.svg';
+import Rectangle2 from '@/assets/images/Rectangle_2.svg';
+
 import {
   Image,
   Pressable,
@@ -58,16 +64,13 @@ export default function OnboardingStep2Screen({ onNext }: Step2Props) {
         </Text>
 
         <View style={styles.imageWrapper}>
-          <Image
-            source={require('@/assets/images/Rectangle_1.png')}
-            style={styles.topImage}
-            resizeMode="cover"
-          />
-          <Image
-            source={require('@/assets/images/Rectangle_2.png')}
-            style={styles.bottomImage}
-            resizeMode="cover"
-          />
+          <View style={styles.half}>
+            <Rectangle1 width="100%" height="100%" />
+          </View>
+
+          <View style={styles.half}>
+            <Rectangle2 width="100%" height="100%" />
+          </View>
         </View>
       </View>
 
@@ -143,8 +146,24 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary100,
   },
 
+
+  topImage: {
+    width: '100%',
+    height: '50%',
+  },
+
+  bottomImage: {
+    width: '100%',
+    height: '50%',
+  },
+  half: {
+    width: '100%',
+    height: '50%',
+  },
+
   topImage: { width: '100%', height: '50%' },
   bottomImage: { width: '100%', height: '50%' },
+
 
   bottomWrap: {
     paddingHorizontal: 24,

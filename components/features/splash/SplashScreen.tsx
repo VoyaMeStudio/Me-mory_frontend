@@ -1,22 +1,21 @@
-import { useRouter } from 'expo-router';
-import { useEffect, useMemo } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import FrameSvg from "@/assets/images/frame.svg";
+import LogoSvg from "@/assets/images/Me-mory.svg";
+import SloganSvg from "@/assets/images/slogan.svg";
+import { useRouter } from "expo-router";
+import { useEffect, useMemo } from "react";
+import { StyleSheet, View, useWindowDimensions } from "react-native";
 
 const FRAME_W = 195;
 const FRAME_H = 138;
 
-const SHIFT_Y = -50;
-
 export default function SplashScreen() {
   const router = useRouter();
+  const { height } = useWindowDimensions();
 
   useEffect(() => {
-    //if (__DEV__) return;
-
     const t = setTimeout(() => {
-      router.replace('/(auth)/onboarding');
+      router.replace("/(auth)/onboarding");
     }, 1000);
-
     return () => clearTimeout(t);
   }, [router]);
 
@@ -30,49 +29,51 @@ export default function SplashScreen() {
     return { logoW, logoH, sloganW, sloganH };
   }, []);
 
+  const TOP = Math.round(height * 0.34);
+
+  const SLOGAN_GAP = 20; 
+
+  const logoTop = Math.round((FRAME_H - logoH) / 2);
+
+  const sloganTop = FRAME_H + SLOGAN_GAP;
+
   return (
     <View style={styles.container}>
-      {/* 프레임 */}
-      <Image
-        source={require('@/assets/images/frame.png')}
-        style={[
-          styles.frame,
-          { width: FRAME_W, height: FRAME_H, transform: [{ translateY: SHIFT_Y }] },
-        ]}
-        resizeMode="contain"
-      />
+      <View style={[styles.anchor, { top: TOP }]}>
+        <View style={styles.frameBox}>
+          <FrameSvg width={FRAME_W} height={FRAME_H} />
 
-      {/* 로고 */}
-      <Image
-        source={require('@/assets/images/Me-mory.png')}
-        style={[
-          styles.logo,
-          {
-            width: logoW,
-            height: logoH,
-            top: '50%',
-            marginTop: -logoH / 2,
-            transform: [{ translateX: -logoW / 2 }, { translateY: SHIFT_Y }],
-          },
-        ]}
-        resizeMode="contain"
-      />
+          <View
+            style={[
+              styles.abs,
+              {
+                top: logoTop,
+                left: "50%",
+                width: logoW,
+                height: logoH,
+                transform: [{ translateX: -logoW / 2 }],
+              },
+            ]}
+          >
+            <LogoSvg width={logoW} height={logoH} />
+          </View>
 
-      {/* 슬로건 */}
-      <Image
-        source={require('@/assets/images/slogan.png')}
-        style={[
-          styles.slogan,
-          {
-            width: sloganW,
-            height: sloganH,
-            top: '50%',
-            marginTop: logoH / 2 + 70,
-            transform: [{ translateX: -sloganW / 2 }, { translateY: SHIFT_Y }],
-          },
-        ]}
-        resizeMode="contain"
-      />
+          <View
+            style={[
+              styles.abs,
+              {
+                top: sloganTop,
+                left: "50%",
+                width: sloganW,
+                height: sloganH,
+                transform: [{ translateX: -sloganW / 2 }],
+              },
+            ]}
+          >
+            <SloganSvg width={sloganW} height={sloganH} />
+          </View>
+        </View>
+      </View>
     </View>
   );
 }
@@ -80,20 +81,22 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F1E8',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#F5F1E8",
   },
 
-  frame: {},
-
-  logo: {
-    position: 'absolute',
-    left: '50%',
+  anchor: {
+    position: "absolute",
+    left: "50%",
+    transform: [{ translateX: -FRAME_W / 2 }],
   },
 
-  slogan: {
-    position: 'absolute',
-    left: '50%',
+  frameBox: {
+    width: FRAME_W,
+    height: FRAME_H + 60,
+    position: "relative",
+  },
+
+  abs: {
+    position: "absolute",
   },
 });
