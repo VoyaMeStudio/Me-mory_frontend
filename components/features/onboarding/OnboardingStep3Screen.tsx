@@ -2,7 +2,6 @@ import OnboardingProgress from '@/components/features/onboarding/OnboardingProgr
 import { Colors } from '@/styles/colors';
 
 import React, { memo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import Card1 from '@/assets/images/card1.svg';
 import Card2 from '@/assets/images/card2.svg';
@@ -14,7 +13,6 @@ const Card2Memo = memo((props: { w: number; h: number }) => (
   <Card2 width={props.w} height={props.h} />
 ));
 
-import React from 'react';
 import {
   Image,
   Pressable,
@@ -117,9 +115,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     paddingHorizontal: 24,
 
-    paddingTop: 200,
-
     paddingTop: 100,
+
     transform: [{ translateY: 100 }],
     zIndex: 2,
 

@@ -2,8 +2,6 @@ import OnboardingProgress from '@/components/features/onboarding/OnboardingProgr
 import { Colors } from '@/styles/colors';
 import React from 'react';
 
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-
 import Rectangle1 from '@/assets/images/Rectangle_1.svg';
 import Rectangle2 from '@/assets/images/Rectangle_2.svg';
 
@@ -146,16 +144,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary100,
   },
 
-
-  topImage: {
-    width: '100%',
-    height: '50%',
-  },
-
-  bottomImage: {
-    width: '100%',
-    height: '50%',
-  },
   half: {
     width: '100%',
     height: '50%',

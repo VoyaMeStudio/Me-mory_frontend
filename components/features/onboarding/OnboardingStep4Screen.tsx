@@ -72,11 +72,7 @@ export default function OnboardingStep4Screen({ onFinish }: Step4Props) {
       <View style={styles.bg} />
 
       <View pointerEvents="none" style={styles.routeLayer}>
-        <Image
-          source={require('@/assets/images/route4.png')}
-          resizeMode="contain"
-          style={styles.routeImage}
-        />
+     
       </View>
 
       <View style={styles.bgOverlay} />
@@ -156,10 +152,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-start',
-
-    paddingHorizontal: 20,
-    paddingTop: 170,
-
     paddingHorizontal: 24,
     paddingTop: 100,
     transform: [{ translateY: 70 }],
