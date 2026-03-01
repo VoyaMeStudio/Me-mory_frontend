@@ -1,5 +1,6 @@
 import OnboardingProgress from '@/components/features/onboarding/OnboardingProgress';
 import { Colors } from '@/styles/colors';
+
 import React, { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -13,23 +14,59 @@ const Card2Memo = memo((props: { w: number; h: number }) => (
   <Card2 width={props.w} height={props.h} />
 ));
 
+import React from 'react';
+import {
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+
+
 type Step3Props = {
   onNext: () => void;
-   onPrev: () => void;
+  onPrev: () => void;
 };
+
+const CARD_W = 165;
+const CARD_H = 245;
 
 export default function OnboardingStep3Screen({ onNext }: Step3Props) {
   const BASE_INDEX = 2;
+  const { width: W, height: H } = useWindowDimensions();
+
+
+  const routeWidth = W * 1.1;
+  const routeHeight = H * 1.1;
+  const routeLeft = W * 0.01;
+  const routeTop = H * 0.01; 
 
   return (
     <View style={styles.container}>
       <View style={styles.bg} />
+      <View pointerEvents="none" style={styles.routeLayer}>
+        <Image
+          source={require('@/assets/images/route3.png')}
+          resizeMode="contain"
+          style={{
+            position: 'absolute',
+            width: routeWidth,
+            height: routeHeight,
+            left: routeLeft,
+            top: routeTop,
+            opacity: 1,
+          }}
+        />
+      </View>
+
       <View style={styles.bgOverlay} />
 
       <View style={styles.centerWrap}>
         <Text style={styles.title}>
           기억된 순간들이 오며{'\n'}
-          나만의 <Text style={styles.highlight}>여행 아카이브</Text>로
+          나만의 여행 아카이브로
         </Text>
 
         <View style={styles.cardWrap}>
@@ -54,10 +91,6 @@ export default function OnboardingStep3Screen({ onNext }: Step3Props) {
   );
 }
 
-
-const CARD_W = 155;
-const CARD_H = 245;
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
@@ -70,6 +103,12 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: Colors.primary150,
     opacity: 0.22,
+    zIndex: 0,
+  },
+
+  routeLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
   },
 
   centerWrap: {
@@ -77,7 +116,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     paddingHorizontal: 24,
+
     paddingTop: 200,
+
+    paddingTop: 100,
+    transform: [{ translateY: 100 }],
+    zIndex: 2,
+
   },
 
   title: {
@@ -97,7 +142,7 @@ const styles = StyleSheet.create({
 
   cardWrap: {
     flexDirection: 'row',
-    columnGap: 18, 
+    columnGap: 18,
     alignItems: 'flex-end',
     marginTop: 8,
   },
@@ -123,6 +168,7 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     marginBottom: 12,
     gap: 16,
+    zIndex: 2,
   },
 
   nextButton: {

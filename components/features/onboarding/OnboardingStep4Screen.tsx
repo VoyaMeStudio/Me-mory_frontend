@@ -70,6 +70,15 @@ export default function OnboardingStep4Screen({ onFinish }: Step4Props) {
   return (
     <View style={styles.container}>
       <View style={styles.bg} />
+
+      <View pointerEvents="none" style={styles.routeLayer}>
+        <Image
+          source={require('@/assets/images/route4.png')}
+          resizeMode="contain"
+          style={styles.routeImage}
+        />
+      </View>
+
       <View style={styles.bgOverlay} />
 
       <View style={styles.centerWrap}>
@@ -119,18 +128,43 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: Colors.primary150,
   },
+
   bgOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: Colors.primary150,
     opacity: 0.22,
+    zIndex: 0,
   },
+
+
+  routeLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
+
+  routeImage: {
+    position: 'absolute',
+    width: Dimensions.get('window').width * 1.1,
+    height: Dimensions.get('window').height * 1.1,
+    left: -Dimensions.get('window').width * 0.03,
+    top: Dimensions.get('window').height * 0.04,
+    opacity: 1,
+  },
+
 
   centerWrap: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-start',
+
     paddingHorizontal: 20,
     paddingTop: 170,
+
+    paddingHorizontal: 24,
+    paddingTop: 100,
+    transform: [{ translateY: 70 }],
+    zIndex: 2,
+
   },
 
   title: {
@@ -162,6 +196,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 34,
     gap: 16,
+    zIndex: 2,
   },
 
   kakaoButton: {
