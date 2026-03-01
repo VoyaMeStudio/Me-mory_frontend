@@ -2,7 +2,6 @@ import OnboardingProgress from '@/components/features/onboarding/OnboardingProgr
 import { Colors } from '@/styles/colors';
 import React from 'react';
 
-import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import PaperStep1 from '@/assets/images/paper_step1.svg';
 
