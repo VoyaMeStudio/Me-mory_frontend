@@ -1,17 +1,18 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 
@@ -27,6 +28,17 @@ type FormState = {
   nameEnFirst: string;
 };
 
+type LocalProfile = {
+  photoUri: string | null;
+  nameKo: string;
+  birthDate: string | null; // YYYY-MM-DD
+  nameEnLast: string;
+  nameEnFirst: string;
+  updatedAt: number;
+};
+
+const PROFILE_KEY = 'local_profile_v1';
+
 export default function ProfileSetup() {
   const router = useRouter();
 
@@ -39,6 +51,26 @@ export default function ProfileSetup() {
   });
 
   const [isDateOpen, setIsDateOpen] = useState(false);
+  
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(PROFILE_KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw) as LocalProfile;
+
+        setForm({
+          photoUri: saved.photoUri ?? null,
+          nameKo: saved.nameKo ?? '',
+          birthDate: saved.birthDate ? new Date(saved.birthDate) : null,
+          nameEnLast: saved.nameEnLast ?? '',
+          nameEnFirst: saved.nameEnFirst ?? '',
+        });
+      } catch {
+  
+      }
+    })();
+  }, []);
 
   const filled = useMemo(() => {
     return (
@@ -87,9 +119,29 @@ export default function ProfileSetup() {
     setForm((prev) => ({ ...prev, birthDate: date }));
   };
 
-  const onSubmit = () => {
+  // 임시 로컬 저장
+  const saveLocalProfile = async () => {
+    const payload: LocalProfile = {
+      photoUri: form.photoUri,
+      nameKo: form.nameKo.trim(),
+      birthDate: form.birthDate ? form.birthDate.toISOString().slice(0, 10) : null,
+      nameEnLast: form.nameEnLast.trim(),
+      nameEnFirst: form.nameEnFirst.trim(),
+      updatedAt: Date.now(),
+    };
+
+    await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(payload));
+  };
+
+  const onSubmit = async () => {
     if (!filled) return;
-    router.replace('/(tabs)');
+
+    try {
+      await saveLocalProfile(); 
+      router.replace('/(tabs)');
+    } catch {
+      Alert.alert('저장 실패', '프로필 정보를 로컬에 저장하지 못했다.');
+    }
   };
 
   return (
@@ -368,33 +420,33 @@ const styles = StyleSheet.create({
 
   startBtn: {
     height: 60,
-    borderRadius: 40, 
+    borderRadius: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   startBtnDisabled: {
-    backgroundColor: Colors.grey200, 
+    backgroundColor: Colors.grey200,
     borderWidth: 0.5,
-    borderColor: Colors.grey300, 
+    borderColor: Colors.grey300,
   },
 
   startBtnEnabled: {
-    backgroundColor: Colors.primary900, 
+    backgroundColor: Colors.primary900,
     borderWidth: 0,
   },
 
   startBtnTextBase: {
-    ...typography.head3_24_regular, 
+    ...typography.head3_24_regular,
     letterSpacing: -0.24,
     textAlign: 'center',
   },
 
   startBtnTextDisabled: {
-    color: Colors.grey500, 
+    color: Colors.grey500,
   },
 
   startBtnTextEnabled: {
-    color: Colors.primary50, 
+    color: Colors.primary50,
   },
 });

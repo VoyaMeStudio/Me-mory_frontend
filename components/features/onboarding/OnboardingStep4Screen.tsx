@@ -1,10 +1,7 @@
 import OnboardingProgress from '@/components/features/onboarding/OnboardingProgress';
 import { useAuth } from '@/context/authContext';
-import axiosInstance from '@/lib/axiosInstance';
 import { Colors } from '@/styles/colors';
-import KakaoLogins from '@react-native-kakao/user';
 import { useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -65,70 +62,11 @@ export default function OnboardingStep4Screen({ onFinish }: Step4Props) {
       ),
     ]);
 
-  const handleKakaoStart = async () => {
-    if (loading) return;
-    setLoading(true);
-
-    try {
-      let token: any;
-      try {
-        token = await withTimeout(KakaoLogins.login(), 15000);
-      } catch (err: any) {
-        console.log('[AUTH] FAIL: KakaoLogins.login()', err?.message ?? err);
-        return;
-      }
-
-      const kakaoAccessToken = token?.accessToken;
-      if (!kakaoAccessToken) {
-        console.log('[AUTH] FAIL: no kakao accessToken');
-        return;
-      }
-
-      let res: any;
-      try {
-        res = await axiosInstance.post('/api/auth/login', {
-          accessToken: kakaoAccessToken,
-        });
-      } catch (err: any) {
-        console.log(
-          '[AUTH] FAIL: backend login',
-          err?.response?.data?.message ?? err?.message ?? err,
-        );
-        return;
-      }
-
-      const jwtToken = res.data?.data?.jwtAccessToken;
-      const registered = res.data?.data?.registered;
-
-      if (!jwtToken) {
-        console.log('[AUTH] FAIL: no jwtAccessToken');
-        return;
-      }
-
-      const pureToken = String(jwtToken).replace(/^Bearer\s+/i, '');
-      await SecureStore.setItemAsync('access_token', pureToken);
-      await checkAuth();
-
-      const FORCE_PROFILE_SETUP =
-        __DEV__ && process.env.EXPO_PUBLIC_FORCE_PROFILE_SETUP === 'true';
-
-      if (FORCE_PROFILE_SETUP) {
-        onFinish?.();
-        router.replace('/onboarding/profile-setup');
-        return;
-      }
-
-      if (registered) {
-        router.replace('/home');
-      } else {
-        onFinish?.();
-        router.replace('/onboarding/profile-setup');
-      }
-    } finally {
-      setLoading(false);
-    }
+  const handleKakaoStart=()=>{
+    if(loading) return;
+    router.push("/(auth)/kakao-webview");
   };
-
+  
   return (
     <View style={styles.container}>
       <View style={styles.bg} />
