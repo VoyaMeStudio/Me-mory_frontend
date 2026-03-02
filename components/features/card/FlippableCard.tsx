@@ -1,8 +1,16 @@
 import { Colors } from '@/styles/colors';
 import { typography } from '@/styles/typography';
 import { Feather } from '@expo/vector-icons';
-import React, { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Image } from 'expo-image';
 import Animated, {
   useAnimatedStyle,
@@ -16,11 +24,60 @@ import KebabMenuIcon from '@/assets/images/kebab_menu.svg';
 
 import type { CardItem } from './types';
 
+type BackScrollbarThumbProps = {
+  scrollY: ReturnType<typeof useSharedValue<number>>;
+  contentHeight: number;
+  layoutHeight: number;
+  trackHeight: number;
+  thumbColor: string;
+};
+
+function BackScrollbarThumb({
+  scrollY,
+  contentHeight,
+  layoutHeight,
+  trackHeight,
+  thumbColor,
+}: BackScrollbarThumbProps) {
+  const thumbStyle = useAnimatedStyle(() => {
+    const range = Math.max(0, contentHeight - layoutHeight);
+    const thumbHeight = Math.max(
+      BACK_SCROLLBAR_THUMB_MIN,
+      Math.min(trackHeight, (layoutHeight / Math.max(1, contentHeight)) * trackHeight)
+    );
+    const maxThumbTop = trackHeight - thumbHeight;
+    const top =
+      range > 0
+        ? (scrollY.value / range) * maxThumbTop
+        : 0;
+    return {
+      position: 'absolute' as const,
+      left: 0,
+      width: BACK_SCROLLBAR_TRACK_WIDTH,
+      height: thumbHeight,
+      top,
+      backgroundColor: thumbColor,
+      borderRadius: BACK_SCROLLBAR_TRACK_WIDTH / 2,
+    };
+  });
+  return <Animated.View style={thumbStyle} />;
+}
+
 const CARD_WIDTH = 300;
 const CARD_HEIGHT = 476;
 
 const CARD_BG_WIDTH = 300;
 const CARD_BG_HEIGHT = 474;
+
+// Back card scrollbar: track spans full photo list height, 12px from card right
+const BACK_SCROLLBAR_TRACK_WIDTH = 6;
+const BACK_SCROLLBAR_PADDING = 8;
+const BACK_SCROLLBAR_LEFT_FROM_CARD = 12;
+const BACK_SCROLLBAR_THUMB_MIN = 24;
+const BACK_SCROLLBAR_COLOR = Colors?.primary300 ?? '#E1D7C3';
+// Vertical alignment with photo area: paddingTop 37 + header ~50 + title ~39
+const BACK_SCROLLBAR_TOP = 37 + 50 + 39;
+const BACK_PHOTO_HEIGHT = 316;
 
 type Props = {
   item: CardItem;
@@ -32,8 +89,28 @@ export default function FlippableCard({ item, cardHeight: customHeight }: Props)
   const rotation = useSharedValue(0);
   const [isFlipped, setIsFlipped] = useState(false);
 
+  const backScrollRef = useRef<ScrollView>(null);
+  const [backScrollContentHeight, setBackScrollContentHeight] = useState(0);
+  const [backScrollLayoutHeight, setBackScrollLayoutHeight] = useState(0);
+  const backScrollY = useSharedValue(0);
+
   const flip = useCallback(() => {
     setIsFlipped((prev) => !prev);
+  }, []);
+
+  const onBackScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      backScrollY.value = e.nativeEvent.contentOffset.y;
+    },
+    [backScrollY]
+  );
+
+  const onBackContentSizeChange = useCallback((_w: number, h: number) => {
+    setBackScrollContentHeight(h);
+  }, []);
+
+  const onBackScrollLayout = useCallback((e: { nativeEvent: { layout: { height: number } } }) => {
+    setBackScrollLayoutHeight(e.nativeEvent.layout.height);
   }, []);
 
   useEffect(() => {
@@ -148,31 +225,70 @@ export default function FlippableCard({ item, cardHeight: customHeight }: Props)
               <Text style={styles.backTitle} numberOfLines={1}>
                 {item.title || '여행명은 공백 포함 14자'}
               </Text>
-              <ScrollView
-                style={styles.backPhotoScroll}
-                contentContainerStyle={styles.backScrollContent}
-                showsVerticalScrollIndicator={true}
-                keyboardShouldPersistTaps="handled"
-              >
-                {images.length > 0 ? (
-                  <View style={styles.backPhotoGrid}>
-                    {images.map((uri, i) => (
-                      <View key={i} style={styles.backGridImageWrap}>
-                        <Image
-                          source={{ uri }}
-                          style={StyleSheet.absoluteFill}
-                          contentFit="cover"
-                        />
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <View style={[styles.backPlaceholder, styles.placeholderImage]}>
-                    <Feather name="image" size={40} color={Colors?.grey400} />
-                  </View>
-                )}
-              </ScrollView>
+              <View style={styles.backPhotoWrap}>
+                <ScrollView
+                  ref={backScrollRef}
+                  style={styles.backPhotoScroll}
+                  contentContainerStyle={styles.backScrollContent}
+                  showsVerticalScrollIndicator={false}
+                  scrollEnabled={images.length > 6}
+                  keyboardShouldPersistTaps="handled"
+                  onScroll={onBackScroll}
+                  onContentSizeChange={onBackContentSizeChange}
+                  onLayout={onBackScrollLayout}
+                  scrollEventThrottle={16}
+                >
+                  {images.length > 0 ? (
+                    <View style={styles.backPhotoGrid}>
+                      {images.map((uri, i) => (
+                        <View key={i} style={styles.backGridImageWrap}>
+                          <Image
+                            source={{ uri }}
+                            style={StyleSheet.absoluteFill}
+                            contentFit="cover"
+                          />
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={[styles.backPlaceholder, styles.placeholderImage]}>
+                      <Feather name="image" size={40} color={Colors?.grey400} />
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
             </View>
+            {images.length > 6 && (
+              <View
+                style={[
+                  styles.backScrollbarOuter,
+                  {
+                    padding: BACK_SCROLLBAR_PADDING,
+                    width:
+                      BACK_SCROLLBAR_PADDING * 2 + BACK_SCROLLBAR_TRACK_WIDTH,
+                  },
+                ]}
+                pointerEvents="none"
+              >
+                <View
+                  style={[
+                    styles.backScrollbarTrack,
+                    {
+                      width: BACK_SCROLLBAR_TRACK_WIDTH,
+                      height: BACK_PHOTO_HEIGHT,
+                    },
+                  ]}
+                >
+                  <BackScrollbarThumb
+                    scrollY={backScrollY}
+                    contentHeight={backScrollContentHeight}
+                    layoutHeight={backScrollLayoutHeight}
+                    trackHeight={BACK_PHOTO_HEIGHT}
+                    thumbColor={BACK_SCROLLBAR_COLOR}
+                  />
+                </View>
+              </View>
+            )}
           </View>
         </Animated.View>
       </View>
@@ -261,6 +377,7 @@ const styles = StyleSheet.create({
     width: 233,
     height: 214,
     borderRadius: 10,
+    overflow: 'hidden',
     marginBottom: 12,
     backgroundColor: Colors?.grey200 ?? '#E2E2E2',
   },
@@ -310,10 +427,30 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 12,
   },
-  backPhotoScroll: {
+  backPhotoWrap: {
     width: 216,
     height: 316,
     alignSelf: 'center',
+    position: 'relative',
+  },
+  backPhotoScroll: {
+    width: 216,
+    height: 316,
+    position: 'absolute',
+    left: 0,
+    top: 0,
+  },
+  backScrollbarOuter: {
+    position: 'absolute',
+    right: BACK_SCROLLBAR_LEFT_FROM_CARD,
+    top: BACK_SCROLLBAR_TOP,
+    height: BACK_PHOTO_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backScrollbarTrack: {
+    borderRadius: BACK_SCROLLBAR_TRACK_WIDTH / 2,
+    overflow: 'hidden',
   },
   backScrollContent: {
     flexGrow: 1,
