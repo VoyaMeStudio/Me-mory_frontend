@@ -9,7 +9,8 @@ import {
   NativeScrollEvent,
   PanResponder,
   StyleSheet,
-  View,
+  View, 
+  
 } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
