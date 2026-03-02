@@ -1,0 +1,32 @@
+#!/bin/sh
+# Apply .gitmessage when creating a new commit (not amend/merge).
+# Enable with: git config core.hooksPath .githooks
+COMMIT_MSG_FILE=$1
+SOURCE=$2
+
+# Only for normal commits (not merge, squash, amend)
+if [ "$SOURCE" != "commit" ]; then
+  exit 0
+fi
+
+# Skip if we're amending and already have a message
+if [ -n "$3" ]; then
+  exit 0
+fi
+
+# Apply template from repo root (hook runs in repo root)
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || ROOT="."
+TEMPLATE="$ROOT/.gitmessage"
+if [ ! -f "$TEMPLATE" ]; then
+  exit 0
+fi
+
+# Replace default message with our template (file is empty or git's default)
+if [ ! -s "$COMMIT_MSG_FILE" ]; then
+  cat "$TEMPLATE" > "$COMMIT_MSG_FILE"
+  exit 0
+fi
+# Git's default message contains "#" lines; if no non-comment line, use template
+if ! grep -v '^#' "$COMMIT_MSG_FILE" | grep -q .; then
+  cat "$TEMPLATE" > "$COMMIT_MSG_FILE"
+fi

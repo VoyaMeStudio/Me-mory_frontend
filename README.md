@@ -1,7 +1,31 @@
 # Me-mory_frontend
 Me-mory Frontend Repository
 
+---
 
+## ⚡ 템플릿 설정 (최초 1회)
+
+**커밋 템플릿**이 안 보이면 터미널에서 한 번 실행하세요:
+
+```bash
+./scripts/setup-templates.sh
+```
+
+또는 직접:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+- **중요:** 커밋 시 **터미널에서** `git commit` 만 입력하고 `-m "메시지"` 를 쓰지 마세요. 그래야 에디터에 템플릿이 열립니다. (IDE 소스 제어 패널에서 쓰면 템플릿이 안 나올 수 있습니다.)
+
+**PR 템플릿**이 안 보이면:
+
+- GitHub는 **기본 브랜치(보통 `main`)에 있는** 템플릿만 사용합니다.
+- 이 템플릿 파일들이 들어 있는 브랜치를 **`main`에 머지한 뒤**부터, 새 PR을 만들 때 본문에 템플릿이 자동으로 채워집니다.
+- 아직 머지 전이라면: 이 브랜치 → `main` PR을 만들고 머지한 다음, 그 다음에 만드는 PR부터 확인하면 됩니다.
+
+---
 
 ### 1️⃣ 디렉토리 구조
 
@@ -156,6 +180,15 @@ Me-mory Frontend Repository
 
 > 형식: `type:#issue_number 메시지`
 
+**커밋 템플릿 사용 (최초 1회 설정)**
+
+- **방법 1 – 훅 사용 (권장):** 터미널에서 한 번만 실행  
+  `git config core.hooksPath .githooks`  
+  이후 `git commit` 시 `.gitmessage` 내용이 자동으로 채워집니다.
+- **방법 2:**  
+  `git config commit.template .gitmessage`  
+  이후 `git commit` 시 에디터에 템플릿이 열립니다.
+
 **예시**
 
     feat:#15 로그인 화면 UI 구현
@@ -177,6 +210,12 @@ Me-mory Frontend Repository
 ---
 
 ### 4️⃣ Pull Request 규칙
+
+**PR 템플릿이 안 보일 때**
+
+- GitHub는 **PR의 base 브랜치(보통 `main` 또는 `develop`)에 있는** 템플릿만 사용합니다.
+- 템플릿을 추가한 브랜치를 base로 머지한 뒤에는 새 PR 생성 시 자동으로 적용됩니다.
+- 템플릿 파일 위치: `.github/PULL_REQUEST_TEMPLATE.md`
 
 **PR 제목 예시**
 

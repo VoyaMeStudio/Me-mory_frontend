@@ -1,0 +1,5 @@
+# 커밋 메시지 규칙: type:#issue_number 메시지
+# 예: feat:#15 로그인 화면 UI 구현
+# type: feat | bugfix | refactor | design | chore
+#
+type:# 이슈번호 메시지 (한 줄 요약)
