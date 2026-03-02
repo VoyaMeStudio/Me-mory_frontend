@@ -1,47 +1,65 @@
-import RecordAdd from "@/assets/images/record_add.svg";
+// StackFab.tsx
 import React from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import {
+  Pressable,
+  StyleProp,
+  StyleSheet,
+  View,
+  ViewStyle,
+} from "react-native";
 
-type StackFabProps = {
-  onPress: () => void;
-  right?: number;
-  bottom?: number;
+import AddPreviousIcon from "@/assets/images/addprevious.svg";
+
+type Props = {
+  onPress?: () => void;
+  style?: StyleProp<ViewStyle>;
   size?: number;
 };
 
-export default function StackFab({
-  onPress,
-  right = 22,
-  bottom = 94,
-  size = 56,
-}: StackFabProps) {
+export default function StackFab({ onPress, style, size = 56 }: Props) {
+  const handlePress = () => {
+    console.log("[StackFab] pressed");
+
+    if (onPress) {
+      console.log("[StackFab] calling parent onPress");
+      onPress();
+    } else {
+      console.log("[StackFab] parent onPress NOT PROVIDED");
+    }
+  };
+
   return (
-    <View style={[styles.wrap, { right, bottom }]} pointerEvents="box-none">
-      <Pressable
-        onPress={onPress}
-        style={[
-          styles.btn,
-          { width: size, height: size, borderRadius: size / 2 },
-        ]}
-      >
-        <RecordAdd width={size * 0.6} height={size * 0.6} />
-      </Pressable>
-    </View>
+    <Pressable
+      onPressIn={() => console.log("[StackFab] pressIn")}
+      onPress={handlePress}
+      hitSlop={20}
+      style={({ pressed }) => [
+        styles.wrapper,
+        pressed && styles.pressed,
+        style,
+      ]}
+    >
+      <View style={styles.iconWrap}>
+        <AddPreviousIcon width={size} height={size} />
+      </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: "absolute" },
-
-  btn: {
-    backgroundColor: "rgba(226, 218, 201, 0.95)",
+  wrapper: {
+    width: 72,
+    height: 72,
     alignItems: "center",
     justifyContent: "center",
+  },
 
-    shadowColor: "#000",
-    shadowOpacity: 0.14,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+  iconWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  pressed: {
+    opacity: 0.7,
   },
 });

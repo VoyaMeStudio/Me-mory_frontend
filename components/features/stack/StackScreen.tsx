@@ -1,25 +1,32 @@
-// StackScreen.tsx
-import React, { useMemo, useState } from "react";
-import {
-  Dimensions,
-  FlatList,
-  Modal,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { Dimensions, FlatList, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors } from "@/styles/colors";
 import { typography } from "@/styles/typography";
 
 import GlobeIllust from "@/assets/images/globe.svg";
-import StackCard, { StackCardItem } from "@/components/features/stack/StackCard";
+import StackCard from "@/components/features/stack/StackCard";
 import StackFab from "@/components/features/stack/StackFab";
 
+import AddPreviousTripModal from "@/components/features/modals/AddPreviousTripModal";
+import TripDetailModal from "@/components/features/modals/TripDetailModal";
+
+import { PreviousTrip } from "@/components/features/stack.types";
+import { diffDaysInclusive, tripToStackCardItem } from "@/components/features/stack.utils";
+
 export default function StackScreen() {
+  const insets = useSafeAreaInsets();
+
   const [openAdd, setOpenAdd] = useState(false);
+
+  useEffect(() => {
+    console.log("[StackScreen] openAdd =", openAdd);
+  }, [openAdd]);
+
+  const [previousTrips, setPreviousTrips] = useState<PreviousTrip[]>([]);
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const [editTrip, setEditTrip] = useState<PreviousTrip | null>(null);
 
   const { contentW } = useMemo(() => {
     const screenW = Dimensions.get("window").width;
@@ -27,141 +34,135 @@ export default function StackScreen() {
     return { contentW: screenW - PADDING_H * 2 };
   }, []);
 
+  const activeTrips = useMemo(() => previousTrips.filter((t) => !t.isArchived), [previousTrips]);
 
-  const data: StackCardItem[] = useMemo(
-    () => [
-      {
-        id: "1",
-        title: "여행명 공백포함 최대 12자 (2일 이하)",
-        dateText: "2026.00.00 ~ 2026.00.00",
-        height: 62,
-        emotionColor: "#F5C7CF",
-      },
-      {
-        id: "2",
-        title: "여행명 공백포함 최대 12자 (4일 이하)",
-        dateText: "2026.00.00 ~ 2026.00.00",
-        height: 70,
-        emotionColor: "#BFD9C8",
-      },
-      {
-        id: "3",
-        title: "여행명 공백포함 최대 12자 (7일 이하)",
-        dateText: "2026.00.00 ~ 2026.00.00",
-        height: 78,
-        emotionColor: "#76B7D6",
-      },
-      {
-        id: "4",
-        title: "여행명 공백포함 최대 12자 (30일 이하)",
-        dateText: "2026.00.00 ~ 2026.00.00",
-        height: 94,
-        emotionColor: "#F2B8C0",
-      },
-      {
-        id: "5",
-        title: "여행명 공백포함 최대 12자 (내일 이하)",
-        dateText: "2026.00.00 ~ 2026.00.00",
-        height: 86,
-        emotionColor: "#5B4B7A",
-      },
-      {
-        id: "6",
-        title: "여행명 공백포함 최대 12자 (90일 이하)",
-        dateText: "2026.00.00 ~ 2026.00.00",
-        height: 102,
-        emotionColor: "#7B5A57",
-      },
-      {
-        id: "7",
-        title: "여행명 공백포함 최대 12자 (180일 이하)",
-        dateText: "2026.00.00 ~ 2026.00.00",
-        height: 110,
-        emotionColor: "#7A0018",
-      },
-    ],
-    []
-  );
+  const stackItems = useMemo(() => {
+    const sorted = [...activeTrips].sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
+    return sorted.map(tripToStackCardItem);
+  }, [activeTrips]);
 
-  const OVERLAP = 18;
-  const STACK_OFFSET = 22;
+  const selectedTrip = useMemo(() => {
+    if (!selectedTripId) return undefined;
+    return previousTrips.find((t) => t.id === selectedTripId);
+  }, [selectedTripId, previousTrips]);
+
+  const totalDays = useMemo(() => {
+    return activeTrips.reduce((sum, t) => sum + diffDaysInclusive(t.startDate, t.endDate), 0);
+  }, [activeTrips]);
+
+  const CARD_GAP = 0;     
+  const Z_LAYER_BASE = 200; 
+
+  const STACK_OFFSET = 60;
+  const SHIFT_X = STACK_OFFSET / 2;
+
+  const FAB_BOTTOM_GAP = 18;
+  const TAB_SAFE_SPACE = 92;
+  const fabBottom = insets.bottom + TAB_SAFE_SPACE + FAB_BOTTOM_GAP;
+
+  const upsertTrip = (trip: PreviousTrip) => {
+    setPreviousTrips((prev) => {
+      const idx = prev.findIndex((x) => x.id === trip.id);
+      if (idx === -1) return [trip, ...prev];
+      const next = [...prev];
+      next[idx] = trip;
+      return next;
+    });
+  };
+
+  const archiveTrip = (id: string) => {
+    setPreviousTrips((prev) => prev.map((t) => (t.id === id ? { ...t, isArchived: true } : t)));
+  };
+
+  const deleteTrip = (id: string) => {
+    setPreviousTrips((prev) => prev.filter((t) => t.id !== id));
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-  
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
         <View style={styles.paperBg} />
         <View style={styles.paperOverlay} />
       </View>
 
       <FlatList
-        data={data}
+        data={stackItems}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: fabBottom + 90 }]}
+        keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <View style={styles.topWrap}>
             <GlobeIllust width={92} height={92} />
             <Text style={styles.summaryText}>
-              오늘까지 총 <Text style={styles.summaryStrong}>42일</Text>을 여행 했습니다!
+              오늘까지 총 <Text style={styles.summaryStrong}>{totalDays}일</Text>을 여행 했습니다!
             </Text>
-            <View style={{ height: 16 }} />
+            <View style={{ height: 6 }} />
           </View>
         }
         renderItem={({ item, index }) => {
           const isLeft = index % 2 === 0;
-
-          const mt = index === 0 ? 0 : -OVERLAP;
-
-          const layer = 1000 - index;
-
-
-          const shiftX = isLeft ? -STACK_OFFSET / 2 : STACK_OFFSET / 2;
+          const shiftX = isLeft ? -SHIFT_X : SHIFT_X;
 
           return (
             <View
               style={{
-                marginTop: mt,
+                marginTop: index === 0 ? 0 : CARD_GAP,
                 position: "relative",
-                zIndex: layer,
-                elevation: layer, 
+                zIndex: Z_LAYER_BASE - index,
+                elevation: Z_LAYER_BASE - index,
                 alignItems: "center",
               }}
             >
               <StackCard
                 item={item}
                 contentW={contentW}
-                side={isLeft ? "left" : "right"} 
-                style={{
-                  transform: [{ translateX: shiftX }], 
-                }}
+                side={isLeft ? "left" : "right"}
+                style={{ transform: [{ translateX: shiftX }] }}
+                onPress={() => setSelectedTripId(item.id)}
               />
             </View>
           );
         }}
-        ListFooterComponent={<View style={{ height: 140 }} />}
       />
 
-      <StackFab onPress={() => setOpenAdd(true)} />
+      <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+        <View style={[styles.fabWrap, { bottom: fabBottom }]}>
+          <StackFab
+            onPress={() => {
+              console.log("[StackScreen] FAB pressed");
+              setOpenAdd(true);
+            }}
+          />
+        </View>
+      </View>
 
-      <Modal
-        transparent
-        animationType="fade"
+      <AddPreviousTripModal
         visible={openAdd}
-        onRequestClose={() => setOpenAdd(false)}
-      >
-        <Pressable style={styles.modalBackdrop} onPress={() => setOpenAdd(false)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitle}>과거 여행 추가</Text>
-            <Text style={styles.modalDesc}>
-              다음 이슈에서 여행명, 날짜, 국가, 감정색 입력 폼을 연결합니다.
-            </Text>
-            <Pressable style={styles.modalBtn} onPress={() => setOpenAdd(false)}>
-              <Text style={styles.modalBtnText}>닫기</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+        mode="create"
+        onClose={() => setOpenAdd(false)}
+        onSubmit={(trip) => upsertTrip(trip)}
+      />
+
+      <AddPreviousTripModal
+        visible={!!editTrip}
+        mode="edit"
+        initial={editTrip ?? undefined}
+        onClose={() => setEditTrip(null)}
+        onSubmit={(trip) => upsertTrip(trip)}
+      />
+
+      <TripDetailModal
+        visible={!!selectedTripId}
+        trip={selectedTrip}
+        onClose={() => setSelectedTripId(null)}
+        onEdit={(trip) => {
+          setSelectedTripId(null);
+          requestAnimationFrame(() => setEditTrip(trip));
+        }}
+        onArchive={(id) => archiveTrip(id)}
+        onDelete={(id) => deleteTrip(id)}
+      />
     </SafeAreaView>
   );
 }
@@ -169,70 +170,18 @@ export default function StackScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors?.primary50 ?? "#F7F5F0" },
 
-  paperBg: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors?.primary50 ?? "#F7F5F0",
-  },
-  paperOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#FFFFFF",
-    opacity: 0.18,
-  },
+  paperBg: { ...StyleSheet.absoluteFillObject, backgroundColor: Colors?.primary50 ?? "#F7F5F0" },
+  paperOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "#FFFFFF", opacity: 0.18 },
 
-  listContent: {
-    paddingTop: 12,
-    paddingHorizontal: 24,
-    paddingBottom: 140,
-  },
+  listContent: { paddingTop: 12, paddingHorizontal: 24, paddingBottom: 24 },
 
-  topWrap: {
-    alignItems: "center",
-    marginTop: 8,
-    marginBottom: 14,
-    gap: 10,
-  },
+  topWrap: { alignItems: "center", marginTop: 8, marginBottom: 14, gap: 10 },
 
-  summaryText: {
-    ...typography.body4_14_regular,
-    color: Colors?.grey700 ?? "#6B665B",
-  },
-  summaryStrong: {
-    ...typography.sub1_14_medium,
-    color: Colors?.grey900 ?? "#2E2A24",
-  },
+  summaryText: { ...typography.body4_14_regular, color: Colors?.grey700 ?? "#6B665B" },
+  summaryStrong: { ...typography.sub1_14_medium, color: Colors?.grey900 ?? "#2E2A24" },
 
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  modalCard: {
-    width: "100%",
-    borderRadius: 18,
-    backgroundColor: "#FFFFFF",
-    padding: 18,
-  },
-  modalTitle: {
-    ...typography.head6_18_regular,
-    color: Colors?.grey900 ?? "#2E2A24",
-    marginBottom: 8,
-  },
-  modalDesc: {
-    ...typography.body4_14_regular,
-    color: Colors?.grey600 ?? "#777166",
-    marginBottom: 14,
-  },
-  modalBtn: {
-    alignSelf: "flex-end",
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: Colors?.grey100 ?? "#EFECE6",
-  },
-  modalBtnText: {
-    ...typography.sub1_14_medium,
-    color: Colors?.grey800 ?? "#3E3A32",
+  fabWrap: {
+    position: "absolute",
+    right: 24,
   },
 });

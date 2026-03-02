@@ -2,7 +2,7 @@ import { Colors } from "@/styles/colors";
 import { typography } from "@/styles/typography";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 type Props = {
   title?: string;
@@ -15,8 +15,9 @@ export default function CollectionHeader({
 }: Props) {
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>{title}</Text>
-
+      <Text style={styles.title} numberOfLines={1}>
+        {title}
+      </Text>
 
       <Pressable
         onPress={onPressProfile}
@@ -40,7 +41,18 @@ const styles = StyleSheet.create({
 
   title: {
     ...typography.head6_18_regular,
+    fontSize: 26,
+    lineHeight: 32,           
+    letterSpacing: -0.26,
+    fontWeight: "400",        
     color: Colors?.grey900 ?? "#2E2A24",
+
+    ...(Platform.OS === "android"
+      ? {
+          includeFontPadding: false,
+          textAlignVertical: "center" as const,
+        }
+      : {}),
   },
 
   profileBtn: {
