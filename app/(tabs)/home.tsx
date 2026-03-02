@@ -2,6 +2,7 @@ import { Colors } from '@/styles/colors';
 import React, { useState } from 'react';
 import { SafeAreaView, StyleSheet, View } from 'react-native';
 
+import CardScreen from '@/components/features/card/CardScreen';
 import CollectionTabs, { CollectionTabKey } from '@/components/features/collection/CollectionTabs';
 import StackScreen from '@/components/features/stack/StackScreen';
 
@@ -19,7 +20,7 @@ export default function IndexScreen() {
       </View>
 
       <View style={styles.content}>
-        {tab === 'card' && <EmptyView />}
+        {tab === 'card' && <CardScreen />}
         {tab === 'stack' && <StackScreen />}    
         {tab === 'timeline' && <EmptyView />}
       </View>

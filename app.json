@@ -8,26 +8,31 @@
     "scheme": "memory",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.memory.app",
-      "infoPlist": {
-        "KAKAO_APP_KEY": "e6ff7fc1bce4e6ed7a1fd05d445b053e",
-        "CFBundleURLTypes": [
-          {
-            "CFBundleTypeRole": "Editor",
-            "CFBundleURLSchemes": [
-              "kakaoe6ff7fc1bce4e6ed7a1fd05d445b053e"
-            ]
-          }
-        ],
-        "LSApplicationQueriesSchemes": [
-          "kakaokompassauth",
-          "storykompassauth",
-          "kakaolink"
+  "supportsTablet": true,
+  "bundleIdentifier": "com.memory.app",
+  "infoPlist": {
+    "KAKAO_APP_KEY": "e6ff7fc1bce4e6ed7a1fd05d445b053e",
+    "CFBundleURLTypes": [
+      {
+        "CFBundleTypeRole": "Editor",
+        "CFBundleURLSchemes": [
+          "kakaoe6ff7fc1bce4e6ed7a1fd05d445b053e"
         ]
       }
-    },
+    ],
+    "LSApplicationQueriesSchemes": [
+      "kakaokompassauth",
+      "storykompassauth",
+      "kakaolink"
+    ],
+
+    "NSPhotoLibraryUsageDescription": "프로필 사진을 설정하기 위해 사진 보관함 접근이 필요합니다.",
+    "NSCameraUsageDescription": "프로필 사진 촬영을 위해 카메라 접근이 필요합니다.",
+    "NSPhotoLibraryAddUsageDescription": "사진을 저장할 때 사진 보관함 접근이 필요합니다."
+  }
+},
     "android": {
       "package": "com.memory.app",
       "adaptiveIcon": {
@@ -53,12 +58,20 @@
         }
       ]
     },
+
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "기록하기를 위해 카메라 접근이 필요합니다."
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -71,9 +84,17 @@
           }
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "프로필 사진을 업로드하기 위해 사진 접근 권한이 필요합니다.",
+          "cameraPermission": "프로필 사진 촬영을 위해 카메라 권한이 필요합니다."
+        }
+      ],
       "expo-secure-store",
       "expo-asset"
     ],
+
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
