@@ -1,0 +1,11 @@
+#!/bin/sh
+# Apply .gitmessage as initial commit message when creating a new commit (not amend/merge).
+# Enable by running once: git config core.hooksPath .githooks
+COMMIT_MSG_FILE=$1
+SOURCE=$2
+if [ "$SOURCE" = "commit" ] && [ -f .gitmessage ]; then
+  # Only prepend template if the message file is empty or looks like default
+  if [ ! -s "$COMMIT_MSG_FILE" ] || grep -q "^# Please enter the commit message" "$COMMIT_MSG_FILE" 2>/dev/null; then
+    cat .gitmessage > "$COMMIT_MSG_FILE"
+  fi
+fi
