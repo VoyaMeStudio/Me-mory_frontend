@@ -3,6 +3,8 @@ import { typography } from '@/styles/typography';
 import { Feather } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  type StyleProp,
+  type ViewStyle,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -31,6 +33,23 @@ type BackScrollbarThumbProps = {
   trackHeight: number;
   thumbColor: string;
 };
+
+function BackScrollbarWrapper({
+  opacity,
+  outerStyle,
+  children,
+}: {
+  opacity: ReturnType<typeof useSharedValue<number>>;
+  outerStyle: StyleProp<ViewStyle>;
+  children: React.ReactNode;
+}) {
+  const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  return (
+    <Animated.View style={[outerStyle, animatedStyle]} pointerEvents="none">
+      {children}
+    </Animated.View>
+  );
+}
 
 function BackScrollbarThumb({
   scrollY,
@@ -93,6 +112,8 @@ export default function FlippableCard({ item, cardHeight: customHeight }: Props)
   const [backScrollContentHeight, setBackScrollContentHeight] = useState(0);
   const [backScrollLayoutHeight, setBackScrollLayoutHeight] = useState(0);
   const backScrollY = useSharedValue(0);
+  const backScrollbarOpacity = useSharedValue(0);
+  const scrollbarHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const flip = useCallback(() => {
     setIsFlipped((prev) => !prev);
@@ -104,6 +125,22 @@ export default function FlippableCard({ item, cardHeight: customHeight }: Props)
     },
     [backScrollY]
   );
+
+  const showBackScrollbar = useCallback(() => {
+    if (scrollbarHideTimeoutRef.current) {
+      clearTimeout(scrollbarHideTimeoutRef.current);
+      scrollbarHideTimeoutRef.current = null;
+    }
+    backScrollbarOpacity.value = withTiming(1, { duration: 150 });
+  }, [backScrollbarOpacity]);
+
+  const hideBackScrollbarAfterDelay = useCallback(() => {
+    if (scrollbarHideTimeoutRef.current) clearTimeout(scrollbarHideTimeoutRef.current);
+    scrollbarHideTimeoutRef.current = setTimeout(() => {
+      scrollbarHideTimeoutRef.current = null;
+      backScrollbarOpacity.value = withTiming(0, { duration: 300 });
+    }, 800);
+  }, [backScrollbarOpacity]);
 
   const onBackContentSizeChange = useCallback((_w: number, h: number) => {
     setBackScrollContentHeight(h);
@@ -234,6 +271,9 @@ export default function FlippableCard({ item, cardHeight: customHeight }: Props)
                   scrollEnabled={images.length > 6}
                   keyboardShouldPersistTaps="handled"
                   onScroll={onBackScroll}
+                  onScrollBeginDrag={showBackScrollbar}
+                  onScrollEndDrag={hideBackScrollbarAfterDelay}
+                  onMomentumScrollEnd={hideBackScrollbarAfterDelay}
                   onContentSizeChange={onBackContentSizeChange}
                   onLayout={onBackScrollLayout}
                   scrollEventThrottle={16}
@@ -259,8 +299,9 @@ export default function FlippableCard({ item, cardHeight: customHeight }: Props)
               </View>
             </View>
             {images.length > 6 && (
-              <View
-                style={[
+              <BackScrollbarWrapper
+                opacity={backScrollbarOpacity}
+                outerStyle={[
                   styles.backScrollbarOuter,
                   {
                     padding: BACK_SCROLLBAR_PADDING,
@@ -268,26 +309,27 @@ export default function FlippableCard({ item, cardHeight: customHeight }: Props)
                       BACK_SCROLLBAR_PADDING * 2 + BACK_SCROLLBAR_TRACK_WIDTH,
                   },
                 ]}
-                pointerEvents="none"
               >
-                <View
-                  style={[
-                    styles.backScrollbarTrack,
-                    {
-                      width: BACK_SCROLLBAR_TRACK_WIDTH,
-                      height: BACK_PHOTO_HEIGHT,
-                    },
-                  ]}
-                >
-                  <BackScrollbarThumb
-                    scrollY={backScrollY}
-                    contentHeight={backScrollContentHeight}
-                    layoutHeight={backScrollLayoutHeight}
-                    trackHeight={BACK_PHOTO_HEIGHT}
-                    thumbColor={BACK_SCROLLBAR_COLOR}
-                  />
+                <View style={styles.backScrollbarInner}>
+                  <View
+                    style={[
+                      styles.backScrollbarTrack,
+                      {
+                        width: BACK_SCROLLBAR_TRACK_WIDTH,
+                        height: BACK_PHOTO_HEIGHT,
+                      },
+                    ]}
+                  >
+                    <BackScrollbarThumb
+                      scrollY={backScrollY}
+                      contentHeight={backScrollContentHeight}
+                      layoutHeight={backScrollLayoutHeight}
+                      trackHeight={BACK_PHOTO_HEIGHT}
+                      thumbColor={BACK_SCROLLBAR_COLOR}
+                    />
+                  </View>
                 </View>
-              </View>
+              </BackScrollbarWrapper>
             )}
           </View>
         </Animated.View>
@@ -445,6 +487,11 @@ const styles = StyleSheet.create({
     right: BACK_SCROLLBAR_LEFT_FROM_CARD,
     top: BACK_SCROLLBAR_TOP,
     height: BACK_PHOTO_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backScrollbarInner: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
