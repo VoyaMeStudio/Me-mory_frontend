@@ -27,9 +27,11 @@ export default function IndexScreen() {
       </View>
 
       <View style={styles.content}>
+
         {tab === "card" && <EmptyView />}
         {tab === "stack" && <StackScreen />}
         {tab === "timeline" && <EmptyView />}
+
       </View>
     </SafeAreaView>
   );

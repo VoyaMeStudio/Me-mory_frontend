@@ -15,10 +15,12 @@ export default function TabLayout() {
   }, [pathname]);
 
   const handleTabPress = (tab: GnbTab) => {
+    if (tab === 'record') {
+      router.push('/record');
+      return;
+    }
     setActiveTab(tab);
-
     if (tab === 'home') router.replace('/(tabs)/home');
-    if (tab === 'record') router.replace('/(tabs)/record');
     if (tab === 'board') router.replace('/(tabs)/board');
   };
 
