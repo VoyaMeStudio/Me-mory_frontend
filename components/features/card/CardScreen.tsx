@@ -10,7 +10,7 @@ import {
   PanResponder,
   StyleSheet,
   View, 
-  
+
 } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
@@ -35,7 +35,7 @@ const PLACEHOLDER_IMAGE = (seed: number) =>
 const MOCK_CARDS: CardItem[] = [
   {
     id: '1',
-    title: '여행명은 공백 포함 14자',
+    title: '여행명은 공백 포함 14자입니다',
     dateRange: '0000.00.00 - 0000.00.00',
     description: '공백 포함 54자 - 여행 설명을 작성해주세요. 어쩌구저쩌구 2줄',
     imageGrid: [
