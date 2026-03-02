@@ -2,7 +2,7 @@ import { Colors } from '@/styles/colors';
 import { typography } from '@/styles/typography';
 import { Feather } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, {
   useAnimatedStyle,
@@ -67,7 +67,10 @@ export default function FlippableCard({ item, cardHeight: customHeight }: Props)
   return (
     <View style={[styles.outerWrap, { width: CARD_WIDTH, height }]}>
       <View style={[styles.cardSize, { width: CARD_WIDTH, height }]}>
-        <Animated.View style={[styles.face, frontAnimatedStyle]}>
+        <Animated.View
+          style={[styles.face, frontAnimatedStyle]}
+          pointerEvents={isFlipped ? 'none' : 'auto'}
+        >
           <View style={styles.card}>
             <View style={styles.cardBgWrap} pointerEvents="none">
               <CardFrontBg
@@ -77,15 +80,14 @@ export default function FlippableCard({ item, cardHeight: customHeight }: Props)
               />
             </View>
             <View style={styles.cardContent} pointerEvents="box-none">
-              <View style={styles.cardHeader} pointerEvents="box-none">
-                <TouchableOpacity
-                  onPress={flip}
+              <View style={styles.cardHeader} pointerEvents="box-none" collapsable={false}>
+                <Pressable
                   style={styles.flipBtn}
-                  activeOpacity={0.7}
+                  onPress={flip}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <FlipButtonIcon width={32} height={32} />
-                </TouchableOpacity>
+                </Pressable>
                 <Pressable style={styles.kebabBtn} onPress={() => {}}>
                   <KebabMenuIcon width={32} height={32} />
                 </Pressable>
@@ -121,7 +123,10 @@ export default function FlippableCard({ item, cardHeight: customHeight }: Props)
           </View>
         </Animated.View>
 
-        <Animated.View style={[styles.face, backAnimatedStyle]}>
+        <Animated.View
+          style={[styles.face, backAnimatedStyle]}
+          pointerEvents={isFlipped ? 'auto' : 'none'}
+        >
           <View style={styles.card}>
             <View style={styles.cardBgWrap} pointerEvents="none">
               <CardFrontBg
@@ -132,14 +137,13 @@ export default function FlippableCard({ item, cardHeight: customHeight }: Props)
             </View>
             <View style={styles.cardContent} pointerEvents="box-none">
               <View style={styles.backHeader}>
-                <TouchableOpacity
+                <Pressable
                   onPress={flip}
                   style={styles.flipBtn}
-                  activeOpacity={0.7}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <FlipButtonIcon width={32} height={32} />
-                </TouchableOpacity>
+                </Pressable>
               </View>
               <Text style={styles.backTitle} numberOfLines={1}>
                 {item.title || '여행명은 공백 포함 14자'}
@@ -219,6 +223,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
+    zIndex: 10,
   },
   flipBtn: {
     padding: 4,

@@ -1,27 +1,26 @@
 import { Colors } from '@/styles/colors';
 import type { CardItem } from '@/components/features/card/types';
 import FlippableCard, { CARD_WIDTH, CARD_HEIGHT } from '@/components/features/card/FlippableCard';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   Dimensions,
   LayoutChangeEvent,
   NativeSyntheticEvent,
   NativeScrollEvent,
   PanResponder,
   StyleSheet,
-  View, 
-
+  View,
 } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import ScrollbarHandle from '@/assets/images/scrollbar_handle.svg';
 import TickMark from '@/assets/images/Tick-mark.svg';
 
 const H_PADDING = 24;
 const CARD_GAP = 19;
-const TRACK_GRADIENT_LEFT = Colors?.primary400 ?? '#C6B9A5';
-const TRACK_GRADIENT_RIGHT = Colors?.primary200 ?? '#F0EAE1';
+const TRACK_LEFT_COLOR = Colors?.primary400 ?? '#C6B9A5';
+const TRACK_RIGHT_COLOR = Colors?.primary300 ?? '#E1D7C3';
 const BAR_WIDTH = 348;
 const BAR_HEIGHT = 8;
 const BAR_BORDER_RADIUS = 40;
@@ -73,6 +72,56 @@ const MOCK_CARDS: CardItem[] = [
       PLACEHOLDER_IMAGE(27),
     ],
   },
+  {
+    id: '4',
+    title: '네 번째 카드',
+    dateRange: '2025.03.01 - 2025.03.07',
+    description: '봄 여행 기록입니다.',
+    imageGrid: [
+      PLACEHOLDER_IMAGE(30),
+      PLACEHOLDER_IMAGE(31),
+      PLACEHOLDER_IMAGE(32),
+    ],
+  },
+  {
+    id: '5',
+    title: '다섯 번째 카드',
+    dateRange: '2025.03.15 - 2025.03.20',
+    description: '주말 소풍 메모.',
+    imageGrid: [
+      PLACEHOLDER_IMAGE(40),
+      PLACEHOLDER_IMAGE(41),
+      PLACEHOLDER_IMAGE(42),
+      PLACEHOLDER_IMAGE(43),
+    ],
+  },
+  {
+    id: '6',
+    title: '여섯 번째 카드',
+    dateRange: '2025.04.01 - 2025.04.05',
+    description: '벚꽃 구경 여행.',
+    imageGrid: [
+      PLACEHOLDER_IMAGE(50),
+      PLACEHOLDER_IMAGE(51),
+      PLACEHOLDER_IMAGE(52),
+      PLACEHOLDER_IMAGE(53),
+      PLACEHOLDER_IMAGE(54),
+    ],
+  },
+  {
+    id: '7',
+    title: '일곱 번째 카드',
+    dateRange: '2025.04.10 - 2025.04.15',
+    description: '가족 여행 기록입니다.',
+    imageGrid: [
+      PLACEHOLDER_IMAGE(60),
+      PLACEHOLDER_IMAGE(61),
+      PLACEHOLDER_IMAGE(62),
+      PLACEHOLDER_IMAGE(63),
+      PLACEHOLDER_IMAGE(64),
+      PLACEHOLDER_IMAGE(65),
+    ],
+  },
 ];
 
 const CONTENT_WIDTH = Dimensions.get('window').width - H_PADDING * 2;
@@ -92,9 +141,12 @@ function indexFromScrollOffset(offsetX: number): number {
 export default function CardScreen() {
   const listRef = useRef<ScrollView>(null);
   const isDraggingBarRef = useRef(false);
+  /** Thumb position (0..trackWidth) during drag, driven by gesture - no re-renders */
+  const thumbPositionAnim = useRef(new Animated.Value(0)).current;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [trackWidth, setTrackWidth] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
+  const [isDraggingHandle, setIsDraggingHandle] = useState(false);
   const itemWidth = ITEM_WIDTH;
   const data = MOCK_CARDS;
 
@@ -141,10 +193,12 @@ export default function CardScreen() {
     return trackWidth / (data.length - 1);
   }, [data.length, trackWidth]);
 
-  const thumbPosition = useMemo(() => {
-    if (data.length <= 1 || trackWidth <= 0) return 0;
-    return currentIndex * step + dragOffset;
-  }, [currentIndex, data.length, trackWidth, step, dragOffset]);
+  // Keep animated thumb in sync when list is scrolled (not dragging handle)
+  useEffect(() => {
+    if (!isDraggingHandle && trackWidth > 0 && data.length > 1) {
+      thumbPositionAnim.setValue(currentIndex * step);
+    }
+  }, [currentIndex, step, isDraggingHandle, trackWidth, data.length, thumbPositionAnim]);
 
   const panResponder = useMemo(
     () =>
@@ -153,32 +207,36 @@ export default function CardScreen() {
         onMoveShouldSetPanResponder: () => true,
         onPanResponderGrant: () => {
           isDraggingBarRef.current = true;
+          setIsDraggingHandle(true);
         },
         onPanResponderMove: (_, gestureState) => {
           if (data.length <= 1 || trackWidth <= 0) return;
           const dx = gestureState.dx;
           const base = currentIndex * step;
           const newPos = Math.min(trackWidth, Math.max(0, base + dx));
-          setDragOffset(newPos - base);
+          thumbPositionAnim.setValue(newPos);
           const fractionalIndex = (data.length - 1) * (newPos / trackWidth);
           const offset = scrollOffsetToCenterCard(fractionalIndex);
           listRef.current?.scrollTo({ x: offset, y: 0, animated: false });
         },
-        onPanResponderRelease: () => {
+        onPanResponderRelease: (_, gestureState) => {
           isDraggingBarRef.current = false;
+          setIsDraggingHandle(false);
           if (data.length <= 1 || trackWidth <= 0) {
             setDragOffset(0);
             return;
           }
-          const currentPos = currentIndex * step + dragOffset;
-          const nearestIndex = Math.round(currentPos / step);
+          const startPos = currentIndex * step;
+          const finalPos = Math.min(trackWidth, Math.max(0, startPos + gestureState.dx));
+          const nearestIndex = Math.round(finalPos / step);
           const clamped = Math.max(0, Math.min(nearestIndex, data.length - 1));
           setDragOffset(0);
           setCurrentIndex(clamped);
+          thumbPositionAnim.setValue(clamped * step);
           scrollToIndex(clamped);
         },
       }),
-    [currentIndex, data.length, trackWidth, step, scrollToIndex]
+    [currentIndex, data.length, trackWidth, step, scrollToIndex, thumbPositionAnim]
   );
 
   const onTrackLayout = useCallback((e: LayoutChangeEvent) => {
@@ -194,8 +252,8 @@ export default function CardScreen() {
               ref={listRef}
               horizontal
               pagingEnabled={false}
-              snapToInterval={ITEM_WIDTH}
-              snapToAlignment="start"
+              snapToInterval={isDraggingHandle ? undefined : ITEM_WIDTH}
+              snapToAlignment={isDraggingHandle ? undefined : 'start'}
               decelerationRate="fast"
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={[styles.listContent, { paddingHorizontal: CONTENT_PADDING_H }]}
@@ -222,56 +280,63 @@ export default function CardScreen() {
             >
               {trackWidth > 0 && (
                 <View style={[styles.trackGradientWrap, { width: trackWidth }]} pointerEvents="none">
-                  <Svg width={trackWidth} height={BAR_HEIGHT} style={styles.trackGradientSvg}>
-                    <Defs>
-                      <LinearGradient
-                        id="scrollbarTrackGradient"
-                        x1="0%"
-                        y1="0%"
-                        x2="100%"
-                        y2="0%"
-                      >
-                        <Stop offset="0%" stopColor={TRACK_GRADIENT_LEFT} />
-                        <Stop offset="100%" stopColor={TRACK_GRADIENT_RIGHT} />
-                      </LinearGradient>
-                    </Defs>
-                    <Rect
-                      x={0}
-                      y={0}
-                      width={trackWidth}
-                      height={BAR_HEIGHT}
-                      rx={BAR_HEIGHT / 2}
-                      ry={BAR_HEIGHT / 2}
-                      fill="url(#scrollbarTrackGradient)"
-                    />
-                  </Svg>
+                  <Animated.View
+                    style={[
+                      styles.trackSegmentLeft,
+                      {
+                        width: thumbPositionAnim,
+                        borderTopLeftRadius: BAR_HEIGHT / 2,
+                        borderBottomLeftRadius: BAR_HEIGHT / 2,
+                      },
+                    ]}
+                  />
+                  <Animated.View
+                    style={[
+                      styles.trackSegmentRight,
+                      {
+                        left: thumbPositionAnim,
+                        borderTopRightRadius: BAR_HEIGHT / 2,
+                        borderBottomRightRadius: BAR_HEIGHT / 2,
+                      },
+                    ]}
+                  />
                 </View>
               )}
               {data.length > 1 &&
                 trackWidth > 0 &&
-                Array.from({ length: data.length }).map((_, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.tickMarkWrap,
-                      {
-                        left: (i / (data.length - 1)) * trackWidth - 2,
-                      },
-                    ]}
-                    pointerEvents="none"
-                  >
-                    <TickMark width={4} height={4} />
-                  </View>
-                ))}
-              <View
+                Array.from({ length: data.length }).map((_, i) => {
+                  const tickLeft = (i / (data.length - 1)) * trackWidth - 2;
+                  const opacity = thumbPositionAnim.interpolate({
+                    inputRange: [tickLeft - 2, tickLeft + 2],
+                    outputRange: [1, 0],
+                    extrapolate: 'clamp',
+                  });
+                  return (
+                    <Animated.View
+                      key={i}
+                      style={[styles.tickMarkWrap, { left: tickLeft }, { opacity }]}
+                      pointerEvents="none"
+                    >
+                      <TickMark width={4} height={4} />
+                    </Animated.View>
+                  );
+                })}
+              <Animated.View
                 {...panResponder.panHandlers}
                 style={[
                   styles.scrollbarThumb,
-                  { left: trackWidth > 0 ? thumbPosition - HANDLE_SIZE / 2 : 0 },
+                  {
+                    left: trackWidth > 0
+                      ? thumbPositionAnim.interpolate({
+                          inputRange: [0, trackWidth],
+                          outputRange: [-HANDLE_SIZE / 2, trackWidth - HANDLE_SIZE / 2],
+                        })
+                      : -HANDLE_SIZE / 2,
+                  },
                 ]}
               >
                 <ScrollbarHandle width={HANDLE_SIZE} height={HANDLE_SIZE} />
-              </View>
+              </Animated.View>
             </View>
           </View>
         </View>
@@ -353,10 +418,21 @@ const styles = StyleSheet.create({
     borderRadius: BAR_BORDER_RADIUS,
     overflow: 'hidden',
   },
-  trackGradientSvg: {
+  trackSegmentLeft: {
     position: 'absolute',
     left: 0,
     top: 0,
+    height: BAR_HEIGHT,
+    backgroundColor: TRACK_LEFT_COLOR,
+    overflow: 'hidden',
+  },
+  trackSegmentRight: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    height: BAR_HEIGHT,
+    backgroundColor: TRACK_RIGHT_COLOR,
+    overflow: 'hidden',
   },
   tickMarkWrap: {
     position: 'absolute',
