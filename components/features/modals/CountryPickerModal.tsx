@@ -34,9 +34,7 @@ const TEXT = Colors?.grey900 ?? "#2E2A24";
 const SUBTEXT = Colors?.grey600 ?? "#777166";
 const PLACEHOLDER = Colors?.grey400 ?? "#A7A093";
 const DIVIDER = Colors?.grey100 ?? "#EFECE6";
-
 const UNDERLINE = Colors?.grey200 ?? "#E7E1D7";
-
 
 const CHIP_BG = "#F9F8F4";
 const CHIP_BORDER = Colors?.primary300 ?? "#D8CCB8";
@@ -49,6 +47,7 @@ const COUNTRY_SEARCH_PATH = "/api/countries";
 async function fetchCountries(keyword: string): Promise<CountryItem[]> {
   const q = keyword.trim();
   if (!q) return [];
+  if (!BASE_URL) throw new Error("BASE_URL이 비어있음 (EXPO_PUBLIC_BACKEND_BASE_URL 확인)");
 
   const url = `${BASE_URL}${COUNTRY_SEARCH_PATH}?keyword=${encodeURIComponent(q)}`;
   const res = await fetch(url, {
@@ -83,6 +82,8 @@ export function CountryInlineInput({ value, onChange, maxSelect = 20 }: InlinePr
       return;
     }
 
+    let alive = true;
+
     const t = setTimeout(async () => {
       try {
         setLoading(true);
@@ -90,6 +91,7 @@ export function CountryInlineInput({ value, onChange, maxSelect = 20 }: InlinePr
 
         const data = await fetchCountries(keyword);
 
+        if (!alive) return;
 
         const selectedCodeSet = new Set(value.map((v) => v.countryCode).filter(Boolean));
         const selectedNameSet = new Set(value.map((v) => v.countryName.trim()));
@@ -102,18 +104,28 @@ export function CountryInlineInput({ value, onChange, maxSelect = 20 }: InlinePr
 
         setRows(filtered.slice(0, 30));
       } catch (e: any) {
+        if (!alive) return;
         setErr(e?.message ?? "검색 실패");
         setRows([]);
       } finally {
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     }, 250);
 
-    return () => clearTimeout(t);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
   }, [q, value]);
 
-  const selectedCodeSet = useMemo(() => new Set(value.map((v) => v.countryCode)), [value]);
-  const selectedNameSet = useMemo(() => new Set(value.map((v) => v.countryName.trim())), [value]);
+  const selectedCodeSet = useMemo(
+    () => new Set(value.map((v) => v.countryCode).filter(Boolean)),
+    [value]
+  );
+  const selectedNameSet = useMemo(
+    () => new Set(value.map((v) => v.countryName.trim())),
+    [value]
+  );
 
   const add = (c: CountryItem) => {
     if (value.length >= maxSelect) return;
@@ -134,7 +146,6 @@ export function CountryInlineInput({ value, onChange, maxSelect = 20 }: InlinePr
   const remove = (codeOrName: string) => {
     onChange(
       value.filter((v) => {
-
         if (v.countryCode) return v.countryCode !== codeOrName;
         return v.countryName.trim() !== codeOrName;
       })
@@ -163,7 +174,6 @@ export function CountryInlineInput({ value, onChange, maxSelect = 20 }: InlinePr
 
   return (
     <View>
-
       <View style={styles.underlineWrap}>
         <TextInput
           value={q}
@@ -193,7 +203,7 @@ export function CountryInlineInput({ value, onChange, maxSelect = 20 }: InlinePr
               {loading || err || rows.length === 0 ? (
                 <View style={styles.emptyRow}>
                   <Text style={styles.emptyText}>
-                    {loading ? "검색 중..." : "검색 결과 없음"}
+                    {loading ? "검색 중..." : err ? err : "검색 결과 없음"}
                   </Text>
                 </View>
               ) : (
@@ -202,9 +212,7 @@ export function CountryInlineInput({ value, onChange, maxSelect = 20 }: InlinePr
                   return (
                     <View key={`${item.countryCode || item.countryName}-${idx}`}>
                       <Pressable style={styles.suggestRow} onPress={() => add(item)}>
-                        <Text style={styles.suggestText}>
-                          {item.countryName}
-                        </Text>
+                        <Text style={styles.suggestText}>{item.countryName}</Text>
                       </Pressable>
                       {!isLast && <View style={styles.divider} />}
                     </View>
@@ -224,7 +232,6 @@ export function CountryInlineInput({ value, onChange, maxSelect = 20 }: InlinePr
         </View>
       )}
 
-
       {value.length > 0 && (
         <View style={styles.chipsWrap}>
           {value.map((c, i) => {
@@ -233,9 +240,7 @@ export function CountryInlineInput({ value, onChange, maxSelect = 20 }: InlinePr
 
             return (
               <View key={key} style={styles.chipSelected}>
-                <Text style={styles.chipTextSelected}>
-                  {c.countryName}
-                </Text>
+                <Text style={styles.chipTextSelected}>{c.countryName}</Text>
 
                 <Pressable onPress={() => remove(removeKey)} style={styles.chipX} hitSlop={8}>
                   <Text style={styles.chipXText}>×</Text>
@@ -293,6 +298,8 @@ const styles = StyleSheet.create({
     ...typography.sub2_12_regular,
     color: SUBTEXT,
     fontSize: 16,
+    textAlign: "center",
+    paddingHorizontal: 12,
   },
 
   scrollbar: {
@@ -322,7 +329,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    marginTop: 20, 
+    marginTop: 20,
     paddingTop: 2,
   },
 
@@ -332,7 +339,7 @@ const styles = StyleSheet.create({
     gap: 10,
     borderWidth: 1,
     borderColor: CHIP_BORDER,
-    backgroundColor: CHIP_BG, 
+    backgroundColor: CHIP_BG,
     paddingHorizontal: 14,
     height: 34,
     borderRadius: 999,

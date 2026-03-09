@@ -1,11 +1,17 @@
-// components/features/stack.utils.ts
 import { PreviousTrip, StackCardItem } from "./stack.types";
 
 export function formatDateYMD(d: Date) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
-  return `${y}.${m}.${day}`;
+  return `${y}-${m}-${day}`;
+}
+
+export function toApiDateYMD(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function diffDaysInclusive(start: Date, end: Date) {
@@ -15,18 +21,6 @@ export function diffDaysInclusive(start: Date, end: Date) {
   return diff + 1;
 }
 
-/**
- * ✅ px 규칙(너가 보낸 기준)
- * 2일 이하: 62
- * 4일 이하: 70
- * 7일 이하: 78
- * 14일 이하: 86
- * 30일 이하: 94
- * 90일 이하: 102
- * 180일 이하: 110
- * 360일 이하: 118
- * 361일~ : 126
- */
 export function ticketHeightByDays(days: number) {
   if (days <= 2) return 62;
   if (days <= 4) return 70;
@@ -43,11 +37,16 @@ export function tripToStackCardItem(t: PreviousTrip): StackCardItem {
   const days = diffDaysInclusive(t.startDate, t.endDate);
   const height = ticketHeightByDays(days);
 
+  const color =
+    typeof t.emotionColor === "string" && t.emotionColor.trim()
+      ? t.emotionColor
+      : "#D9D3C7";
+
   return {
-    id: t.id,
-    title: t.title,
+    id: String(t.id),
+    title: t.tripName,
     dateText: `${formatDateYMD(t.startDate)} ~ ${formatDateYMD(t.endDate)}`,
     height,
-    emotionColor: t.emotion?.color ?? "#D9D3C7", // ✅ 감정 없으면 기본색
+    emotionColor: color,
   };
 }
