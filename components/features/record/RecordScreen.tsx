@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Redirect, usePathname, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Pressable,
@@ -56,7 +56,8 @@ const PERMISSION_CHECK_TIMEOUT_MS = 3000;
 
 function RecordScreenContent() {
   const router = useRouter();
-  const cameraRef = useRef<any>(null);
+  const topCameraRef = useRef<any>(null);
+  const bottomCameraRef = useRef<any>(null);
 
   const [permission, requestPermission] = useCameraPermissions!();
   const [permissionCheckTimedOut, setPermissionCheckTimedOut] = useState(false);
@@ -66,7 +67,8 @@ function RecordScreenContent() {
   const [selfieUri, setSelfieUri] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
-  const [cameraReady, setCameraReady] = useState(false);
+  const [topCameraReady, setTopCameraReady] = useState(false);
+  const [bottomCameraReady, setBottomCameraReady] = useState(false);
 
   useEffect(() => {
     if (permission != null) return;
@@ -75,16 +77,24 @@ function RecordScreenContent() {
   }, [permission]);
 
   const oppositeFacing: CameraFacing = topFacing === 'back' ? 'front' : 'back';
+  const showTopCamera = !mainUri;
+  const showBottomCamera = !!mainUri && !selfieUri;
 
   const clearCountdown = useCallback(() => {
     setCountdown(null);
   }, []);
 
-  const takePicture = useCallback(async (): Promise<string | null> => {
-    if (!cameraRef.current || !cameraReady || isCapturing) return null;
+  const takePictureWithRef = useCallback(async (ref: React.RefObject<any>, _isReady: boolean): Promise<string | null> => {
+    // Attempt taking a photo as soon as possible. Some devices/dev-builds can fire `onCameraReady`
+    // slightly later, so readiness gating can cause the 2nd capture to never happen.
+    if (!ref.current || isCapturing) return null;
     setIsCapturing(true);
     try {
-      const cam = cameraRef.current as { takePictureAsync: (opts: { quality?: number }) => Promise<{ uri: string }> };
+      const cam = ref.current as { takePictureAsync?: (opts: { quality?: number }) => Promise<{ uri: string }> };
+      if (typeof cam?.takePictureAsync !== 'function') {
+        __DEV__ && console.warn('takePictureAsync not available on camera ref');
+        return null;
+      }
       const result = await cam.takePictureAsync({ quality: 0.9 });
       if (result?.uri) return result.uri;
     } catch (e) {
@@ -93,31 +103,45 @@ function RecordScreenContent() {
       setIsCapturing(false);
     }
     return null;
-  }, [cameraReady, isCapturing]);
+  }, [isCapturing]);
 
   const onCapturePress = useCallback(async () => {
     if (!mainUri) {
-      const uri = await takePicture();
+      // First photo: take with top camera (default back, user can flip to selfie)
+      const uri = await takePictureWithRef(topCameraRef, topCameraReady);
       if (uri) {
-        setCameraReady(false);
+        setTopCameraReady(false);
         setMainUri(uri);
         setCountdown(COUNTDOWN_SECONDS);
       }
       return;
     }
-  }, [mainUri, takePicture]);
+    // Second photo: user can tap button instead of waiting for countdown
+    if (selfieUri) return;
+    const uri = await takePictureWithRef(bottomCameraRef, bottomCameraReady);
+    if (uri) {
+      clearCountdown();
+      setSelfieUri(uri);
+      setStep('review');
+    }
+  }, [mainUri, selfieUri, topCameraReady, bottomCameraReady, takePictureWithRef, clearCountdown]);
 
   useEffect(() => {
     if (mainUri == null || selfieUri != null || countdown == null) return;
 
     if (countdown <= 0) {
-      clearCountdown();
-      takePicture().then((uri) => {
+      // Retry automatically until the bottom camera can actually capture.
+      (async () => {
+        const uri = await takePictureWithRef(bottomCameraRef, bottomCameraReady);
         if (uri) {
+          clearCountdown();
           setSelfieUri(uri);
           setStep('review');
+          return;
         }
-      });
+        // Keep countdown non-null so this effect runs again and retries.
+        setCountdown(1);
+      })();
       return;
     }
 
@@ -125,7 +149,7 @@ function RecordScreenContent() {
       setCountdown((prev) => (prev == null || prev <= 1 ? 0 : prev - 1));
     }, 1000);
     return () => clearInterval(id);
-  }, [mainUri, selfieUri, countdown, clearCountdown, takePicture]);
+  }, [mainUri, selfieUri, countdown, clearCountdown, bottomCameraReady, takePictureWithRef]);
 
   const onFlipCamera = useCallback(() => {
     setTopFacing((f) => (f === 'back' ? 'front' : 'back'));
@@ -204,7 +228,7 @@ function RecordScreenContent() {
           </View>
           <View style={styles.centerMessage}>
             <Text style={styles.messageText}>기록하기를 위해 카메라 접근이 필요합니다.</Text>
-            <Pressable style={styles.permissionBtn} onPress={requestPermission}>
+            <Pressable style={styles.permissionBtn} onPress={() => typeof requestPermission === 'function' && requestPermission()}>
               <Text style={styles.permissionBtnText}>권한 허용</Text>
             </Pressable>
           </View>
@@ -212,9 +236,6 @@ function RecordScreenContent() {
       </SafeAreaView>
     );
   }
-
-  const showTopCamera = !mainUri;
-  const showBottomCamera = !!mainUri && !selfieUri;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -227,22 +248,25 @@ function RecordScreenContent() {
           <View style={styles.headerRight} />
         </View>
 
-        {/* Two distinct boxes in the middle */}
         <View style={styles.boxesWrap}>
-          {/* Top box: camera feed or first photo + countdown */}
           <View style={styles.boxTop}>
             {step === 'capture' ? (
               showTopCamera ? (
                 <>
                   <CameraView
-                    ref={cameraRef}
+                    ref={topCameraRef}
                     style={StyleSheet.absoluteFill}
                     facing={topFacing}
-                    onCameraReady={() => setCameraReady(true)}
+                    onCameraReady={() => setTopCameraReady(true)}
                   />
                   <View style={styles.aspectHintWrap} pointerEvents="box-none">
                     <Feather name="maximize-2" size={20} color={Colors.grey500} />
                   </View>
+                  {__DEV__ && topCameraReady && (
+                    <View style={styles.cameraStatusBadge}>
+                      <Text style={styles.cameraStatusText}>Camera ready</Text>
+                    </View>
+                  )}
                 </>
               ) : (
                 <>
@@ -255,7 +279,7 @@ function RecordScreenContent() {
                   )}
                   {countdown != null && countdown >= 0 && (
                     <View style={styles.countdownOverlay}>
-                      <Text style={styles.countdownText}>{countdown}</Text>
+                      <Text style={styles.countdownText}>{countdown}s</Text>
                     </View>
                   )}
                 </>
@@ -271,16 +295,22 @@ function RecordScreenContent() {
             )}
           </View>
 
-          {/* Bottom box: placeholder or second (selfie) camera */}
           <View style={styles.boxBottom}>
             {step === 'capture' ? (
               showBottomCamera ? (
-                <CameraView
-                  ref={cameraRef}
-                  style={StyleSheet.absoluteFill}
-                  facing={oppositeFacing}
-                  onCameraReady={() => setCameraReady(true)}
-                />
+                <>
+                  <CameraView
+                    ref={bottomCameraRef}
+                    style={StyleSheet.absoluteFill}
+                    facing={oppositeFacing}
+                    onCameraReady={() => setBottomCameraReady(true)}
+                  />
+                  {__DEV__ && bottomCameraReady && (
+                    <View style={styles.cameraStatusBadge}>
+                      <Text style={styles.cameraStatusText}>Bottom ready</Text>
+                    </View>
+                  )}
+                </>
               ) : (
                 <View style={styles.placeholder}>
                   <Feather name="maximize-2" size={28} color={Colors.grey400} />
@@ -300,6 +330,7 @@ function RecordScreenContent() {
 
         {step === 'capture' ? (
           <View style={styles.footer}>
+            <View style={styles.footerSpacer} />
             <Pressable
               style={[styles.captureBtn, isCapturing && styles.captureBtnDisabled]}
               onPress={onCapturePress}
@@ -307,13 +338,17 @@ function RecordScreenContent() {
             >
               <View style={styles.captureBtnInner} />
             </Pressable>
-            <Pressable
-              style={styles.flipBtnFooter}
-              onPress={onFlipCamera}
-              hitSlop={12}
-            >
-              <Feather name="refresh-cw" size={24} color={Colors.grey700} />
-            </Pressable>
+            <View style={styles.footerSpacer}>
+              {!mainUri && (
+                <Pressable
+                  style={styles.flipBtnCorner}
+                  onPress={onFlipCamera}
+                  hitSlop={12}
+                >
+                  <Feather name="refresh-cw" size={24} color={Colors.grey700} />
+                </Pressable>
+              )}
+            </View>
           </View>
         ) : (
           <View style={styles.reviewActions}>
@@ -331,12 +366,6 @@ function RecordScreenContent() {
 }
 
 export default function RecordScreen() {
-  const pathname = usePathname();
-  const router = useRouter();
-
-  if (typeof pathname === 'string' && pathname.includes('record') && pathname.includes('tabs')) {
-    return <Redirect href="/record" />;
-  }
   if (!CameraView || !useCameraPermissions) {
     return <RecordScreenCameraUnavailable />;
   }
@@ -393,20 +422,32 @@ const styles = StyleSheet.create({
   },
   boxesWrap: {
     flex: 1,
-    gap: 12,
+    gap: 0,
+    alignItems: 'center',
     minHeight: 400,
+    marginTop: 35,
   },
   boxTop: {
-    flex: 2,
+    width: 347,
+    height: 319,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    borderWidth: 0.75,
+    borderColor: Colors.grey550,
+    borderBottomWidth: 0,
     backgroundColor: Colors.grey150,
-    borderRadius: 16,
     overflow: 'hidden',
     position: 'relative',
   },
   boxBottom: {
-    flex: 1,
-    backgroundColor: Colors.grey200,
-    borderRadius: 16,
+    width: 347,
+    height: 319,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    borderWidth: 0.75,
+    borderColor: Colors.grey550,
+    borderTopWidth: 0,
+    backgroundColor: '#CECBC6',
     overflow: 'hidden',
     position: 'relative',
   },
@@ -418,9 +459,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  cameraStatusBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 6,
+  },
+  cameraStatusText: {
+    ...typography.body3_16_regular,
+    color: Colors.primary50,
+    fontSize: 12,
+  },
   countdownOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -437,9 +492,14 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 24,
-    gap: 20,
+    minHeight: 72,
+  },
+  footerSpacer: {
+    flex: 1,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   captureBtn: {
     width: 72,
@@ -450,7 +510,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  flipBtnFooter: {
+  flipBtnCorner: {
     width: 48,
     height: 48,
     borderRadius: 24,

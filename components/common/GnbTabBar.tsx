@@ -32,14 +32,14 @@ export const GnbTabBar: React.FC<GnbTabBarProps> = ({
           label="모음"
           isActive={activeTab === "home"}
           onPress={() => onTabPress("home")}
-          style={{ marginRight: 95 }} 
+          style={{ marginRight: 95 }}
         />
         <GnbItem
           tabKey="record"
           label="기록하기"
           isActive={activeTab === "record"}
           onPress={() => onTabPress("record")}
-          style={{ marginRight: 95 }} 
+          style={{ marginRight: 95 }}
         />
         <GnbItem
           tabKey="board"

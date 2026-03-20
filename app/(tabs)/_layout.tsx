@@ -1,5 +1,5 @@
 import { GnbTab, GnbTabBar } from '@/components/common/GnbTabBar';
-import { Tabs, usePathname, useRouter } from 'expo-router';
+import { router as globalRouter, Tabs, usePathname, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 
 export default function TabLayout() {
@@ -16,7 +16,8 @@ export default function TabLayout() {
 
   const handleTabPress = (tab: GnbTab) => {
     if (tab === 'record') {
-      router.push('/record');
+      // Push onto root stack so record opens as fullScreenModal (no bottom nav)
+      globalRouter.push('/record');
       return;
     }
     setActiveTab(tab);
@@ -33,7 +34,6 @@ export default function TabLayout() {
       tabBar={() => <GnbTabBar activeTab={activeTab} onTabPress={handleTabPress} />}
     >
       <Tabs.Screen name="home" options={{ title: '홈' }} />
-      <Tabs.Screen name="record" options={{ title: '기록하기' }} />
       <Tabs.Screen name="board" options={{ title: '보드' }} />
     </Tabs>
   );
