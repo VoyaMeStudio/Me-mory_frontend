@@ -1,23 +1,24 @@
+import { deleteBoard, updateBoardStickers } from "@/api/board";
 import AddBoardModal from "@/components/features/board/AddBoardModal";
 import BoardBottomSheet from "@/components/features/board/BoardBottomSheet";
 import BoardCanvas from "@/components/features/board/BoardCanvas";
 import BoardFloatingButton from "@/components/features/board/BoardFloatingButton";
 import BoardList from "@/components/features/board/BoardList";
 import BoardMoreMenu from "@/components/features/board/BoardMoreMenu";
+import BoardToast from "@/components/features/board/BoardToast";
 import DeleteBoardDialog from "@/components/features/board/DeleteBoardDialog";
 import CollectionHeader from "@/components/features/home/homeHeader";
 import { STICKER_CATALOG_MOCK } from "@/constants/boardAssets";
 import useBoardEdit from "@/hooks/useBoardEdit";
 import useBoardList from "@/hooks/useBoardList";
 import { Colors } from "@/styles/colors";
-import { typography } from "@/styles/typography";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   SafeAreaView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 
@@ -31,41 +32,39 @@ export default function BoardTabScreen() {
   const [mode, setMode] = useState<BoardScreenMode>("list");
   const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
   const [menuBoardId, setMenuBoardId] = useState<number | null>(null);
+  const [deleteTargetBoardId, setDeleteTargetBoardId] = useState<number | null>(null);
   const [isDeleteDialogVisible, setIsDeleteDialogVisible] = useState(false);
+  const [isDeleteToastVisible, setIsDeleteToastVisible] = useState(false);
+
+  const {
+    board: editingBoard,
+    isLoading: isEditLoading,
+    selectedTab,
+    setSelectedTab,
+    selectedBoardStickerId,
+    stickerCatalog,
+    handleAddSticker,
+    handleDeleteSticker,
+    handleSelectSticker,
+    fetchBoardDetail,
+  } = useBoardEdit(selectedBoardId);
+
 
   const selectedBoard = useMemo(() => {
     if (selectedBoardId == null) return null;
-    return boards.find((board) => board.boardId === selectedBoardId) ?? null;
-  }, [boards, selectedBoardId]);
+    const basicInfo = boards.find((b) => b.boardId === selectedBoardId);
+    if (!basicInfo) return null;
 
-  const menuBoard = useMemo(() => {
-    if (menuBoardId == null) return null;
-    return boards.find((board) => board.boardId === menuBoardId) ?? null;
-  }, [boards, menuBoardId]);
-
- const {
-  board: editingBoard,
-  isLoading: isEditLoading,
-  selectedTab,
-  setSelectedTab,
-  selectedBoardStickerId,
-  stickerCatalog,
-  handleAddSticker,
-  handleDeleteSticker,
-  handleSelectSticker,
-  fetchBoardDetail,
-} = useBoardEdit(selectedBoardId);
+    
+    return editingBoard && editingBoard.boardId === selectedBoardId
+      ? editingBoard
+      : { ...basicInfo, stickers: [] }; 
+  }, [boards, selectedBoardId, editingBoard]);
 
   const handlePressBoard = (boardId: number) => {
     setSelectedBoardId(boardId);
     setMenuBoardId(null);
     setMode("detail");
-  };
-
-  const handleBackToList = () => {
-    setMode("list");
-    setSelectedBoardId(null);
-    setMenuBoardId(null);
   };
 
   const handleMoveToEdit = () => {
@@ -76,92 +75,77 @@ export default function BoardTabScreen() {
     setMode("edit");
   };
 
-  const handleSaveBoard = async (
-    title: string,
-    boardThemeId: 1 | 2 | 3 | 4
-  ) => {
-    const ok = await handleCreateBoard(title, boardThemeId);
-    if (ok) {
-      setIsAddModalVisible(false);
+  const handleCancelEdit = () => {
+    setMode("detail");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedBoardId || !editingBoard) return;
+
+    try {
+      await updateBoardStickers(selectedBoardId, editingBoard.stickers);
+      
+      await fetchBoardDetail();
+      await fetchBoards(); 
+      setMode("detail");
+    } catch (error) {
+      console.error("보드 저장 실패:", error);
+      alert("저장에 실패했습니다.");
     }
   };
 
+  const handleSaveBoard = async (title: string, boardThemeId: 1 | 2 | 3 | 4) => {
+    const ok = await handleCreateBoard(title, boardThemeId);
+    if (ok) setIsAddModalVisible(false);
+  };
+
   const handleDeleteBoard = async () => {
-    setIsDeleteDialogVisible(false);
-    setMenuBoardId(null);
-    setMode("list");
-    setSelectedBoardId(null);
-    await fetchBoards();
+    if (deleteTargetBoardId == null) return;
+    try {
+      await deleteBoard(deleteTargetBoardId);
+      setIsDeleteDialogVisible(false);
+      setMenuBoardId(null);
+      if (selectedBoardId === deleteTargetBoardId) {
+        setSelectedBoardId(null);
+        setMode("list");
+      }
+      setDeleteTargetBoardId(null);
+      await fetchBoards();
+      setIsDeleteToastVisible(true);
+    } catch (error) {
+      console.error("보드 삭제 실패:", error);
+    }
   };
 
   const renderHeader = () => {
     if (mode === "edit") {
       return (
         <View style={styles.editHeader}>
-          <Pressable onPress={() => setMode("detail")}>
-            <Text style={styles.editHeaderText}>취소</Text>
-          </Pressable>
-
-          <Pressable onPress={() => setMode("detail")}>
-            <Text style={styles.editHeaderText}>저장</Text>
-          </Pressable>
+          <TouchableOpacity onPress={handleCancelEdit} hitSlop={20}>
+            <Text style={styles.editHeaderActionText}>취소</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleSaveEdit} hitSlop={20}>
+            <Text style={[styles.editHeaderActionText, styles.editHeaderActionTextBold]}>저장</Text>
+          </TouchableOpacity>
         </View>
       );
     }
-
     return <CollectionHeader title="보드" />;
   };
 
-  const renderListContent = () => {
-    if (boards.length === 0) {
-      return (
-        <View style={styles.loaderContainer}>
-          <Text style={styles.emptyText}>아직 생성된 보드가 없습니다.</Text>
-        </View>
-      );
-    }
-
-    if (boards.length === 1) {
-      const onlyBoard = boards[0];
-
-      return (
-        <View style={styles.singleBoardDetailWrapper}>
-          <BoardCanvas
-            title={onlyBoard.title}
-            boardThemeId={onlyBoard.boardThemeId}
-            stickers={[]}
-            showMenuButton
-            onPressMenu={() => {
-              setSelectedBoardId(onlyBoard.boardId);
-              setMenuBoardId(onlyBoard.boardId);
-            }}
-          />
-        </View>
-      );
-    }
-
-    return <BoardList boards={boards} onPressBoard={handlePressBoard} />;
-  };
-
   const renderDetailContent = () => {
-    if (!selectedBoard) {
-      return (
-        <View style={styles.loaderContainer}>
-          <Text style={styles.emptyText}>보드를 찾을 수 없습니다.</Text>
-        </View>
-      );
-    }
+   
+    const board = selectedBoard as any; 
+    if (!board) return null;
 
     return (
       <View style={styles.detailWrapper}>
         <BoardCanvas
-          title={selectedBoard.title}
-          boardThemeId={selectedBoard.boardThemeId}
-          stickers={[]}
+          title={board.title}
+          boardThemeId={board.boardThemeId}
+          stickers={board.stickers || []} 
           showMenuButton
-          onPressMenu={() => {
-            setMenuBoardId(selectedBoard.boardId);
-          }}
+          onPressMenu={() => setMenuBoardId(board.boardId)}
         />
       </View>
     );
@@ -184,41 +168,34 @@ export default function BoardTabScreen() {
             boardThemeId={editingBoard.boardThemeId}
             stickers={editingBoard.stickers}
             editable
+            showMenuButton={false}
             selectedBoardStickerId={selectedBoardStickerId}
             onPressSticker={handleSelectSticker}
             onDeleteSticker={handleDeleteSticker}
           />
         </View>
-
         <View style={styles.bottomSheetArea}>
-         <BoardBottomSheet
-  selectedTab={selectedTab}
-  onChangeTab={setSelectedTab}
-  stickerItems={stickerCatalog ?? STICKER_CATALOG_MOCK}
-  onPressSticker={handleAddSticker}
-  onCompleteCreateCustomIcon={async () => {
-    await fetchBoardDetail();
-  }}
-/>
+          <BoardBottomSheet
+            selectedTab={selectedTab}
+            onChangeTab={setSelectedTab}
+            stickerItems={stickerCatalog ?? STICKER_CATALOG_MOCK}
+            onPressSticker={handleAddSticker}
+            onCompleteCreateCustomIcon={fetchBoardDetail}
+          />
         </View>
       </View>
     );
   };
 
   return (
-    <SafeAreaView
-      style={[styles.safeArea, mode === "edit" && styles.safeAreaEdit]}
-    >
+    <SafeAreaView style={[styles.safeArea, mode === "edit" && styles.safeAreaEdit]}>
       <View style={[styles.container, mode === "edit" && styles.containerEdit]}>
         {renderHeader()}
-
         {isLoading ? (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="small" color={Colors.primary700} />
-          </View>
+          <View style={styles.loaderContainer}><ActivityIndicator size="small" color={Colors.primary700} /></View>
         ) : mode === "list" ? (
           <>
-            {renderListContent()}
+            <BoardList boards={boards} onPressBoard={handlePressBoard} />
             <BoardFloatingButton onPress={() => setIsAddModalVisible(true)} />
           </>
         ) : mode === "detail" ? (
@@ -230,94 +207,37 @@ export default function BoardTabScreen() {
         <BoardMoreMenu
           visible={menuBoardId != null}
           onRequestClose={() => setMenuBoardId(null)}
-          onPressEdit={() => {
-            handleMoveToEdit();
-          }}
+          onPressEdit={handleMoveToEdit}
           onPressDelete={() => {
+            setDeleteTargetBoardId(menuBoardId);
             setMenuBoardId(null);
             setIsDeleteDialogVisible(true);
           }}
         />
-
-        <AddBoardModal
-          visible={isAddModalVisible}
-          isCreating={isCreating}
-          onClose={() => setIsAddModalVisible(false)}
-          onSave={handleSaveBoard}
-        />
-
-        <DeleteBoardDialog
-          visible={isDeleteDialogVisible}
-          onClose={() => setIsDeleteDialogVisible(false)}
-          onConfirm={handleDeleteBoard}
-        />
+        <AddBoardModal visible={isAddModalVisible} isCreating={isCreating} onClose={() => setIsAddModalVisible(false)} onSave={handleSaveBoard} />
+        <DeleteBoardDialog visible={isDeleteDialogVisible} onClose={() => setIsDeleteDialogVisible(false)} onConfirm={handleDeleteBoard} />
+        <BoardToast visible={isDeleteToastVisible} message="보드가 삭제되었습니다." onHide={() => setIsDeleteToastVisible(false)} />
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: Colors.primary50,
-  },
-  safeAreaEdit: {
-    backgroundColor: Colors.grey800,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: Colors.primary50,
-  },
-  containerEdit: {
-    flex: 1,
-    backgroundColor: Colors.grey800,
-  },
-
+  safeArea: { flex: 1, backgroundColor: Colors.primary50 },
+  safeAreaEdit: { backgroundColor: Colors.grey800 },
+  container: { flex: 1, backgroundColor: Colors.primary50 },
+  containerEdit: { flex: 1, backgroundColor: Colors.grey800 },
   editHeader: {
-    minHeight: 44,
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 6,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    position: "absolute", top: 0, left: 0, right: 0, height: 52,
+    paddingHorizontal: 24, flexDirection: "row", alignItems: "center",
+    justifyContent: "space-between", backgroundColor: Colors.grey800,
+    zIndex: 9999, elevation: 10,
   },
-  editHeaderText: {
-    ...typography.body4_14_regular,
-    color: Colors.primary50,
-  },
-
-  loaderContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptyText: {
-    ...typography.body4_14_regular,
-    color: Colors.grey600,
-  },
-
-  singleBoardDetailWrapper: {
-    flex: 1,
-    paddingTop: 6,
-    paddingBottom: 24,
-    position: "relative",
-  },
-
-  detailWrapper: {
-    flex: 1,
-    paddingBottom: 20,
-    position: "relative",
-  },
-
-  editWrapper: {
-    flex: 1,
-  },
-  editCanvasArea: {
-    flex: 1,
-    paddingTop: 8,
-  },
-  bottomSheetArea: {
-    width: "100%",
-  },
+  editHeaderActionText: { fontFamily: "Nanum NeuRisNeuRisCe", fontSize: 20, color: "#B0AA9F" },
+  editHeaderActionTextBold: { color: "#FFFFFF", fontWeight: "600" },
+  loaderContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
+  detailWrapper: { flex: 1, paddingBottom: 20, position: "relative" },
+  editWrapper: { flex: 1, position: "relative", marginTop: 52 },
+  editCanvasArea: { flex: 1, paddingTop: 8, paddingBottom: 250 },
+  bottomSheetArea: { position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10 },
 });

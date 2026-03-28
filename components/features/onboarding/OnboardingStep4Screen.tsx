@@ -6,18 +6,12 @@ import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
+  Image,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-
-import Travel1 from '@/assets/images/travel_1.svg';
-import Travel2 from '@/assets/images/travel_2.svg';
-import Travel3 from '@/assets/images/travel_3.svg';
-import Travel4 from '@/assets/images/travel_4.svg';
-import Travel5 from '@/assets/images/travel_5.svg';
-import Travel6 from '@/assets/images/travel_6.svg';
 
 import KakaoIcon from '@/assets/images/kakao.svg';
 
@@ -27,7 +21,15 @@ type Step4Props = {
 };
 
 const PAD = 8;
-const Travels = [Travel1, Travel2, Travel3, Travel4, Travel5, Travel6];
+
+const travelImages = [
+  require('@/assets/images/travel_1.png'),
+  require('@/assets/images/travel_2.png'),
+  require('@/assets/images/travel_3.png'),
+  require('@/assets/images/travel_4.png'),
+  require('@/assets/images/travel_5.png'),
+  require('@/assets/images/travel_6.png'),
+];
 
 export default function OnboardingStep4Screen({ onFinish }: Step4Props) {
   const router = useRouter();
@@ -40,9 +42,7 @@ export default function OnboardingStep4Screen({ onFinish }: Step4Props) {
     const screenW = Dimensions.get('window').width;
 
     const H_PADDING = 20;
-
     const gridW = screenW - H_PADDING * 2;
-
     const gap = 3;
 
     const cardW = Math.floor((gridW - gap * 2) / 3);
@@ -54,26 +54,16 @@ export default function OnboardingStep4Screen({ onFinish }: Step4Props) {
     return { gridW, cardW, cardH, innerW, innerH, gap };
   }, []);
 
-  const withTimeout = <T,>(p: Promise<T>, ms = 15000) =>
-    Promise.race<T>([
-      p,
-      new Promise<T>((_, rej) =>
-        setTimeout(() => rej(new Error(`TIMEOUT ${ms}ms`)), ms),
-      ),
-    ]);
-
-  const handleKakaoStart=()=>{
-    if(loading) return;
-    router.push("/(auth)/kakao-webview");
+  const handleKakaoStart = () => {
+    if (loading) return;
+    router.push('/(auth)/kakao-webview');
   };
-  
+
   return (
     <View style={styles.container}>
       <View style={styles.bg} />
 
-      <View pointerEvents="none" style={styles.routeLayer}>
-     
-      </View>
+      <View pointerEvents="none" style={styles.routeLayer} />
 
       <View style={styles.bgOverlay} />
 
@@ -84,7 +74,7 @@ export default function OnboardingStep4Screen({ onFinish }: Step4Props) {
         </Text>
 
         <View style={[styles.grid, { width: gridW, columnGap: gap }]}>
-          {Travels.map((T, idx) => (
+          {travelImages.map((img, idx) => (
             <View
               key={idx}
               style={[
@@ -92,7 +82,11 @@ export default function OnboardingStep4Screen({ onFinish }: Step4Props) {
                 { width: cardW, height: cardH, padding: PAD },
               ]}
             >
-              <T width={innerW} height={innerH} />
+              <Image
+                source={img}
+                style={{ width: innerW, height: innerH }}
+                resizeMode="contain"
+              />
             </View>
           ))}
         </View>
@@ -107,9 +101,7 @@ export default function OnboardingStep4Screen({ onFinish }: Step4Props) {
           disabled={loading}
         >
           <KakaoIcon width={17} height={16} />
-          <Text style={styles.kakaoButtonText}>
-            카카오로 5초만에 시작하기
-          </Text>
+          <Text style={styles.kakaoButtonText}>카카오로 5초만에 시작하기</Text>
           {loading && <ActivityIndicator style={{ marginLeft: 8 }} />}
         </Pressable>
       </View>
@@ -132,7 +124,6 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
 
-
   routeLayer: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 1,
@@ -147,7 +138,6 @@ const styles = StyleSheet.create({
     opacity: 1,
   },
 
-
   centerWrap: {
     flex: 1,
     alignItems: 'center',
@@ -156,7 +146,6 @@ const styles = StyleSheet.create({
     paddingTop: 100,
     transform: [{ translateY: 70 }],
     zIndex: 2,
-
   },
 
   title: {

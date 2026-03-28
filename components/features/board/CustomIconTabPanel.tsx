@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -10,10 +11,16 @@ import {
 type ConvertStatus = "idle" | "selected" | "converting" | "done";
 
 type Props = {
+  visible: boolean;
+  onClose: () => void;
   onCompleteCreate: () => Promise<void> | void;
 };
 
-export default function CustomIconTabPanel({ onCompleteCreate }: Props) {
+export default function CustomIconTabPanel({
+  visible,
+  onClose,
+  onCompleteCreate,
+}: Props) {
   const [status, setStatus] = useState<ConvertStatus>("idle");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -30,9 +37,7 @@ export default function CustomIconTabPanel({ onCompleteCreate }: Props) {
       setStatus("converting");
       setIsSubmitting(true);
 
-      // 여기서 실제 AI 생성이 이미 백엔드에서 처리된다고 했으니
-      // 부모가 넘겨준 onCompleteCreate() 호출만 하면 됨
-      await onCompleteCreate();
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       setStatus("done");
     } catch (e) {
@@ -43,7 +48,7 @@ export default function CustomIconTabPanel({ onCompleteCreate }: Props) {
     }
   };
 
-  const handleReset = () => {
+  const handleDelete = () => {
     setStatus("idle");
   };
 
@@ -51,160 +56,208 @@ export default function CustomIconTabPanel({ onCompleteCreate }: Props) {
     setStatus("selected");
   };
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.topLabelWrap}>
-        <Text style={styles.topLabel}>커스텀 아이콘 추가</Text>
-      </View>
+  const renderPreviewContent = () => {
+    if (status === "idle") {
+      return (
+        <Pressable style={styles.previewInner} onPress={handlePasteMock}>
+          <Text style={styles.placeholderText}>더블 클릭 후 붙여넣기</Text>
+        </Pressable>
+      );
+    }
 
-      <View style={styles.previewBox}>
-        {status === "idle" && (
-          <Pressable style={styles.fullCenter} onPress={handlePasteMock}>
-            <Text style={styles.placeholder}>더블 클릭 후 붙여넣기</Text>
-          </Pressable>
-        )}
+    if (status === "selected" || status === "converting") {
+      return (
+        <View style={styles.previewInner}>
+          <Text style={styles.starIcon}>★</Text>
 
-        {status === "selected" && (
-          <View style={styles.fullCenter}>
-            <Text style={styles.previewIcon}>★</Text>
-
-            <View style={styles.deleteBubbleWrap}>
-              <View style={styles.deleteBubble}>
-                <Text style={styles.deleteBubbleText}>삭제</Text>
+          {status === "selected" && (
+            <Pressable style={styles.deleteTooltipWrap} onPress={handleDelete}>
+              <View style={styles.deleteTooltip}>
+                <Text style={styles.deleteTooltipText}>삭제</Text>
               </View>
-              <View style={styles.deleteBubbleTail} />
+              <View style={styles.deleteTooltipTail} />
+            </Pressable>
+          )}
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.previewInner}>
+        {/* 임시 아이콘 */}
+        <Text style={styles.doneIcon}>⭐️</Text>
+      </View>
+    );
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={styles.modalOverlay}>
+        <View style={styles.sheetContainer}>
+          <View style={styles.handle} />
+
+          <View style={styles.headerRow}>
+            <View style={styles.headerSide}></View>
+            <View style={styles.headerCenter}>
+              <Text style={styles.headerTitle}>커스텀 아이콘 추가</Text>
+            </View>
+            <View style={styles.headerSide}></View>
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.contentArea}>
+  
+            <View style={styles.previewBox}>
+              {renderPreviewContent()}
             </View>
 
-            <Pressable style={styles.deleteHotspot} onPress={handleReset} />
-          </View>
-        )}
+            {status === "selected" && (
+              <Pressable
+                style={styles.primaryButton}
+                onPress={handleConvert}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.primaryButtonText}>그림체 변환하기</Text>
+              </Pressable>
+            )}
 
-        {status === "converting" && (
-          <View style={styles.fullCenter}>
-            <ActivityIndicator size="small" color="#FFFFFF" />
-            <Text style={styles.convertingText}>변환중</Text>
-          </View>
-        )}
+            {status === "converting" && (
+              <View style={styles.primaryButtonDisabled}>
+                <Text style={styles.primaryButtonTextDisabled}>그림체 변환하기</Text>
+              </View>
+            )}
 
-        {status === "done" && (
-          <View style={styles.fullCenter}>
-            <Text style={styles.previewIcon}>★</Text>
+            {status === "done" && (
+              <Pressable
+                style={styles.secondaryButton}
+                onPress={handleCancelConverted}
+              >
+                <Text style={styles.secondaryButtonText}>그림체 변환 취소하기</Text>
+              </Pressable>
+            )}
+
+            {status === "idle" && (
+              <View style={{ height: 56, marginTop: 24 }} />
+            )}
           </View>
-        )}
+        </View>
       </View>
 
-      {status === "selected" && (
-        <Pressable
-          style={styles.primaryButton}
-          onPress={handleConvert}
-          disabled={isSubmitting}
-        >
-          <Text style={styles.primaryButtonText}>그림체 변환하기</Text>
-        </Pressable>
-      )}
-
+    
       {status === "converting" && (
-        <View style={styles.primaryButtonDisabled}>
-          <Text style={styles.primaryButtonText}>그림체 변환하기</Text>
+        <View style={styles.fullScreenLoadingOverlay}>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+          <Text style={styles.loadingText}>변환중</Text>
         </View>
       )}
-
-      {status === "done" && (
-        <Pressable
-          style={styles.secondaryButton}
-          onPress={handleCancelConverted}
-        >
-          <Text style={styles.secondaryButtonText}>그림체 변환 취소하기</Text>
-        </Pressable>
-      )}
-    </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 16,
-    paddingBottom: 18,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    justifyContent: "flex-end",
+  },
+  sheetContainer: {
+    backgroundColor: "#F7F7F5",
+    height: "88%",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 12,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    backgroundColor: "#E5E0D8",
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 16,
   },
 
-  topLabelWrap: {
+  headerRow: {
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
+    justifyContent: "space-between",
+    marginBottom: 16,
   },
-
-  topLabel: {
+  headerSide: {
+    width: 60,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: "center",
+  },
+  headerTitle: {
     color: "#827765",
-    textAlign: "center",
     fontFamily: "Nanum NeuRisNeuRisCe",
     fontSize: 24,
-    fontStyle: "normal",
     fontWeight: "400",
-    lineHeight: 24,
-    letterSpacing: -0.24,
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: "#E5DED2",
+    marginBottom: 24,
+  },
+
+  contentArea: {
+    flex: 1,
+    justifyContent: "space-between",
   },
 
   previewBox: {
-    height: 420,
-    borderRadius: 20,
-    backgroundColor: "#F8F6F1",
-    borderWidth: 1,
-    borderColor: "#EEE8DE",
-    overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  fullCenter: {
     flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  previewInner: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
     width: "100%",
-    alignItems: "center",
-    justifyContent: "center",
   },
 
-  placeholder: {
-    color: "#1A1A1A",
-    textAlign: "center",
+  placeholderText: {
+    color: "#6D665A",
     fontFamily: "Nanum NeuRisNeuRisCe",
-    fontSize: 22,
-    fontStyle: "normal",
-    fontWeight: "400",
-    lineHeight: 22,
-    letterSpacing: -0.22,
+    fontSize: 24,
   },
 
-  previewIcon: {
-    fontSize: 96,
-    color: "#DDD7CE",
+  starIcon: {
+    fontSize: 120,
+    color: "#DAD7D0",
+  },
+  doneIcon: {
+    fontSize: 120,
   },
 
-  deleteBubbleWrap: {
+  deleteTooltipWrap: {
     position: "absolute",
-    top: 112,
+    top: "30%",
     alignItems: "center",
+    zIndex: 10,
   },
-
-  deleteBubble: {
-    minWidth: 58,
-    height: 34,
-    paddingHorizontal: 12,
+  deleteTooltip: {
+    minWidth: 69,
+    height: 40,
     borderRadius: 6,
-    backgroundColor: "#CCB595",
+    backgroundColor: "#C6B9A5",
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 10,
   },
-
-  deleteBubbleText: {
-    color: "#4F473B",
-    textAlign: "center",
+  deleteTooltipText: {
+    color: "#3E372D",
     fontFamily: "Nanum NeuRisNeuRisCe",
-    fontSize: 18,
-    fontStyle: "normal",
-    fontWeight: "400",
-    lineHeight: 18,
-    letterSpacing: -0.18,
+    fontSize: 26,
   },
-
-  deleteBubbleTail: {
+  deleteTooltipTail: {
     width: 0,
     height: 0,
     borderLeftWidth: 6,
@@ -212,77 +265,64 @@ const styles = StyleSheet.create({
     borderTopWidth: 8,
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
-    borderTopColor: "#CCB595",
+    borderTopColor: "#CFC0A7",
     marginTop: -1,
   },
 
-  deleteHotspot: {
-    position: "absolute",
-    top: 98,
-    width: 90,
-    height: 60,
+  fullScreenLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.70)", 
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 999, 
   },
-
-  convertingText: {
-    marginTop: 12,
-    color: "#FFFFFF",
-    textAlign: "center",
+  loadingText: {
+    marginTop: 16,
+    color: "#FFF",
     fontFamily: "Nanum NeuRisNeuRisCe",
-    fontSize: 22,
-    fontStyle: "normal",
-    fontWeight: "400",
-    lineHeight: 22,
-    letterSpacing: -0.22,
+    fontSize: 26,
   },
 
   primaryButton: {
-    marginTop: 18,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#5F5848",
+    marginTop: 24,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#544C3F",
     alignItems: "center",
     justifyContent: "center",
   },
-
   primaryButtonDisabled: {
-    marginTop: 18,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#1A1A1A",
+    marginTop: 24,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#544C3F",
     alignItems: "center",
     justifyContent: "center",
   },
-
   primaryButtonText: {
     color: "#FFFFFF",
-    textAlign: "center",
     fontFamily: "Nanum NeuRisNeuRisCe",
-    fontSize: 22,
-    fontStyle: "normal",
-    fontWeight: "400",
-    lineHeight: 22,
-    letterSpacing: -0.22,
+    fontSize: 24,
+  },
+  primaryButtonTextDisabled: {
+    color: "#FFFFFF",
+    fontFamily: "Nanum NeuRisNeuRisCe",
+    fontSize: 24,
   },
 
   secondaryButton: {
-    marginTop: 18,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: "#D8D1C7",
-    backgroundColor: "#FFFFFF",
+    marginTop: 24,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1.5,
+    borderColor: "#AFA38F",
+    backgroundColor: "#FEFEFE",
     alignItems: "center",
     justifyContent: "center",
   },
-
   secondaryButtonText: {
-    color: "#827765",
-    textAlign: "center",
+    color: "#9E927C",
     fontFamily: "Nanum NeuRisNeuRisCe",
-    fontSize: 22,
-    fontStyle: "normal",
-    fontWeight: "400",
-    lineHeight: 22,
-    letterSpacing: -0.22,
+    fontSize: 24,
   },
 });

@@ -1,5 +1,6 @@
+import { typography } from "@/styles/typography";
 import React, { useEffect } from "react";
-import { Animated, StyleSheet, Text } from "react-native";
+import { Animated, StyleSheet, Text, View } from "react-native";
 
 type Props = {
   visible: boolean;
@@ -33,26 +34,39 @@ export default function BoardToast({ visible, message, onHide }: Props) {
   if (!visible) return null;
 
   return (
-    <Animated.View style={[styles.toast, { opacity }]}>
-      <Text style={styles.text}>{message}</Text>
-    </Animated.View>
+    <View pointerEvents="none" style={styles.wrapper}>
+      <Animated.View style={[styles.toast, { opacity }]}>
+        <Text style={styles.text}>{message}</Text>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  toast: {
+  wrapper: {
     position: "absolute",
     bottom: 110,
-    alignSelf: "center",
-    backgroundColor: "#5F5848",
-    borderRadius: 24,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    left: 0,
+    right: 0,
+    alignItems: "center",
     zIndex: 30,
   },
+
+  toast: {
+    width: 296,
+    paddingVertical: 7,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    backgroundColor: "rgba(62, 55, 45, 0.80)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   text: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "600",
+    ...typography.body4_14_regular,
+    fontSize:20,
+    color: "#FEFEFE",
+    lineHeight: 20,
+    textAlign: "center",
   },
 });

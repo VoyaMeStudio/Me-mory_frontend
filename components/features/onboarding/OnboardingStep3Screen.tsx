@@ -1,18 +1,6 @@
 import OnboardingProgress from '@/components/features/onboarding/OnboardingProgress';
 import { Colors } from '@/styles/colors';
-
-import React, { memo } from 'react';
-
-import Card1 from '@/assets/images/card1.svg';
-import Card2 from '@/assets/images/card2.svg';
-
-const Card1Memo = memo((props: { w: number; h: number }) => (
-  <Card1 width={props.w} height={props.h} />
-));
-const Card2Memo = memo((props: { w: number; h: number }) => (
-  <Card2 width={props.w} height={props.h} />
-));
-
+import React from 'react';
 import {
   Image,
   Pressable,
@@ -21,7 +9,6 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-
 
 type Step3Props = {
   onNext: () => void;
@@ -35,15 +22,15 @@ export default function OnboardingStep3Screen({ onNext }: Step3Props) {
   const BASE_INDEX = 2;
   const { width: W, height: H } = useWindowDimensions();
 
-
   const routeWidth = W * 1.1;
   const routeHeight = H * 1.1;
   const routeLeft = W * 0.01;
-  const routeTop = H * 0.01; 
+  const routeTop = H * 0.01;
 
   return (
     <View style={styles.container}>
       <View style={styles.bg} />
+
       <View pointerEvents="none" style={styles.routeLayer}>
         <Image
           source={require('@/assets/images/route3.png')}
@@ -69,11 +56,19 @@ export default function OnboardingStep3Screen({ onNext }: Step3Props) {
 
         <View style={styles.cardWrap}>
           <View style={styles.card}>
-            <Card1Memo w={CARD_W} h={CARD_H} />
+            <Image
+              source={require('@/assets/images/card1.png')}
+              style={styles.cardImage}
+              resizeMode="contain"
+            />
           </View>
 
           <View style={styles.card}>
-           <Card2Memo w={CARD_W} h={CARD_H} />
+            <Image
+              source={require('@/assets/images/card2.png')}
+              style={styles.cardImage}
+              resizeMode="contain"
+            />
           </View>
         </View>
       </View>
@@ -114,12 +109,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     paddingHorizontal: 24,
-
     paddingTop: 100,
-
     transform: [{ translateY: 100 }],
     zIndex: 2,
-
   },
 
   title: {
@@ -156,8 +148,8 @@ const styles = StyleSheet.create({
   },
 
   cardImage: {
-    width: '100%',
-    height: '100%',
+    width: CARD_W,
+    height: CARD_H,
   },
 
   bottomWrap: {

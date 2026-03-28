@@ -1,10 +1,10 @@
 import axiosInstance from "@/lib/axiosInstance";
 import type {
-    ApiResponse,
-    BoardDetailResponse,
-    BoardListItemResponse,
-    CreateBoardRequest,
-    CreateBoardResponse,
+  ApiResponse,
+  BoardDetailResponse,
+  BoardListItemResponse,
+  CreateBoardRequest,
+  CreateBoardResponse,
 } from "@/types/board";
 
 export async function getBoards() {
@@ -32,6 +32,25 @@ export async function getBoardDetail(boardId: number) {
 export async function deleteBoard(boardId: number) {
   const res = await axiosInstance.delete<ApiResponse<{}>>(
     `/api/users/me/boards/${boardId}`
+  );
+  return res.data.data;
+}
+
+export async function updateBoardStickers(boardId: number, stickers: any[]) {
+  const payload = {
+    stickers: stickers.map((s) => ({
+      boardStickerId: s.boardStickerId,
+      stickerId: s.stickerId,
+      x: s.x,
+      y: s.y,
+      rotation: s.rotation,
+      scale: s.scale,
+      zIndex: s.zIndex,
+    })),
+  };
+  const res = await axiosInstance.put<ApiResponse<{}>>(
+    `/api/v1/boards/${boardId}/stickers`, 
+    payload
   );
   return res.data.data;
 }

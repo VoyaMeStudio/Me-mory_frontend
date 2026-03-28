@@ -1,3 +1,4 @@
+import { typography } from "@/styles/typography";
 import React from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -42,24 +43,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
   },
   dialog: {
-    width: "100%",
-    borderRadius: 22,
+    width: 296,
+    height: 160,
+    borderRadius: 24,
     backgroundColor: "#FFFFFF",
     paddingHorizontal: 20,
     paddingTop: 24,
     paddingBottom: 18,
   },
   title: {
+    ...typography.head4_22_regular,
     textAlign: "center",
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#5B5348",
+    fontSize: 20,
+    fontWeight: "400",
+    color: "#3E372D",
   },
   desc: {
+    ...typography.sub1_14_medium,
     marginTop: 10,
     textAlign: "center",
-    fontSize: 13,
-    color: "#9B9488",
+    fontSize: 18,
+    color: "#6B6252",
   },
   buttonRow: {
     flexDirection: "row",
@@ -76,8 +80,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   cancelText: {
-    fontSize: 14,
-    color: "#7F776B",
+    ...typography.sub1_14_medium,
+    fontSize: 20,
+    color: "#988D7A",
     fontWeight: "600",
   },
   confirmButton: {
@@ -89,8 +94,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   confirmText: {
-    fontSize: 14,
-    color: "#FFFFFF",
+    ...typography.sub1_14_medium,
+    fontSize: 20,
+    color: "#F9F8F4",
     fontWeight: "600",
   },
 });
