@@ -1,6 +1,12 @@
-// TripDetailModal.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  InteractionManager,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { Colors } from "@/styles/colors";
 import { typography } from "@/styles/typography";
@@ -11,54 +17,74 @@ import KebabMenuIcon from "@/assets/images/kebab_menu.svg";
 import EditIcon from "@/assets/images/report_icon.svg";
 
 import ConfirmDialog from "@/components/features/modals/ConfirmDialog";
-import { PreviousTrip } from "../stack.types";
+import type { PreviousTrip } from "../stack.types";
 
 type Props = {
   visible: boolean;
   trip?: PreviousTrip;
   onClose: () => void;
+
   onEdit: (trip: PreviousTrip) => void;
-  onArchive: (id: string) => void;
-  onDelete: (id: string) => void;
+  onArchive: (id: number) => void;
+  onDelete: (id: number) => void;
 };
 
-type CountryItem = {
-  countryCode: string;
-  countryName: string;
-  emoji?: string; // ✅ 국기 이모지
-};
-
-type ApiResponse = {
-  code: number;
-  message: string;
-  data: CountryItem[];
-};
-
-const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_BASE_URL ?? "";
-const COUNTRY_SEARCH_PATH = "/api/countries";
-
-async function fetchCountriesByKeyword(keyword: string): Promise<CountryItem[]> {
-  const q = keyword.trim();
-  if (!q) return [];
-  const url = `${BASE_URL}${COUNTRY_SEARCH_PATH}?keyword=${encodeURIComponent(q)}`;
-  const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error(`Country search failed: ${res.status}`);
-  const json = (await res.json()) as ApiResponse;
-  return Array.isArray(json?.data) ? json.data : [];
-}
-
-function normalizeName(s: string) {
-  return (s ?? "").trim().toLowerCase();
-}
-
-// ✅ 요일까지 포함
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"] as const;
+
 function formatDateYMDWithDay(d: Date) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   const dow = WEEK[d.getDay()];
   return `${y}년 ${m}월 ${day}일 (${dow})`;
+}
+
+function toDateSafe(v: unknown): Date | null {
+  if (!v) return null;
+  if (v instanceof Date && !Number.isNaN(v.getTime())) return v;
+
+  if (typeof v === "string") {
+    const s = v.includes(".") ? v.replace(/\./g, "-") : v;
+    const [y, m, d] = s.split("-").map((n) => Number(n));
+    if (!y || !m || !d) return null;
+    const dt = new Date(y, m - 1, d);
+    if (Number.isNaN(dt.getTime())) return null;
+    return dt;
+  }
+
+  return null;
+}
+
+function toNumberId(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function flagEmojiFromCountryCode(code?: string) {
+  if (!code) return undefined;
+  const cc = String(code).trim().toUpperCase();
+  if (cc.length !== 2) return undefined;
+
+  const A = 0x1f1e6;
+  const first = cc.charCodeAt(0) - 65 + A;
+  const second = cc.charCodeAt(1) - 65 + A;
+  if (first < A || second < A) return undefined;
+
+  return String.fromCodePoint(first, second);
+}
+
+function normalizeCode(v: unknown) {
+  const s = String(v ?? "").trim().toUpperCase();
+  return s || undefined;
+}
+
+function normalizeName(v: unknown) {
+  const s = String(v ?? "").trim();
+  return s || undefined;
 }
 
 const CARD_BG = "#FFFFFF";
@@ -71,6 +97,12 @@ const TEXT_SUB = Colors?.grey500 ?? "#8C8578";
 const CHIP_BG = "#F9F8F4";
 const CHIP_BORDER = Colors?.primary300 ?? "#E7E1D7";
 const CHIP_TEXT = Colors?.primary900 ?? Colors?.grey900 ?? "#544C3F";
+
+type CountryViewItem = {
+  key: string;
+  countryName: string;
+  emoji?: string;
+};
 
 export default function TripDetailModal({
   visible,
@@ -87,10 +119,18 @@ export default function TripDetailModal({
   const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
   const [openDeletedDone, setOpenDeletedDone] = useState(false);
 
-  // ✅ 국가 이모지 캐시
-  const cacheRef = useRef<Record<string, CountryItem>>({});
-  const [countryMap, setCountryMap] = useState<Record<string, CountryItem>>({});
-  const [countryLoading, setCountryLoading] = useState(false);
+  const t: any = trip as any;
+
+  const tripId = useMemo(() => {
+    return toNumberId(t?.id ?? t?.tripId);
+  }, [t?.id, t?.tripId]);
+
+  const titleText = useMemo(() => {
+    return (t?.tripName ?? t?.title ?? "").toString();
+  }, [t?.tripName, t?.title]);
+
+  const start = useMemo(() => toDateSafe(t?.startDate), [t?.startDate]);
+  const end = useMemo(() => toDateSafe(t?.endDate), [t?.endDate]);
 
   useEffect(() => {
     if (!visible) return;
@@ -99,87 +139,129 @@ export default function TripDetailModal({
     setOpenArchivedDone(false);
     setOpenDeleteConfirm(false);
     setOpenDeletedDone(false);
-  }, [visible, trip?.id]);
+  }, [visible, tripId]);
 
   const dateText = useMemo(() => {
-    if (!trip) return "";
-    return `${formatDateYMDWithDay(trip.startDate)} ~ ${formatDateYMDWithDay(trip.endDate)}`;
-  }, [trip]);
+    if (!start || !end) return "";
+    return `${formatDateYMDWithDay(start)} ~ ${formatDateYMDWithDay(end)}`;
+  }, [start, end]);
 
-  // ✅ trip의 countries 이름 → emoji 붙인 데이터 만들기
-  useEffect(() => {
-    if (!visible || !trip) return;
-
-    let mounted = true;
-
-    const load = async () => {
-      try {
-        setCountryLoading(true);
-
-        const names = (trip.countries ?? []).map((c) => (c ?? "").trim()).filter(Boolean);
-
-        const need = names.filter((n) => !cacheRef.current[normalizeName(n)]);
-        if (need.length === 0) {
-          if (mounted) setCountryMap({ ...cacheRef.current });
-          return;
-        }
-
-        const results = await Promise.all(
-          need.map(async (name) => {
-            try {
-              const list = await fetchCountriesByKeyword(name);
-              const exact = list.find((x) => normalizeName(x.countryName) === normalizeName(name));
-              return [name, exact ?? list[0] ?? null] as const;
-            } catch {
-              return [name, null] as const;
-            }
-          })
-        );
-
-        if (!mounted) return;
-
-        for (const [name, item] of results) {
-          const key = normalizeName(name);
-          cacheRef.current[key] =
-            item ?? ({ countryCode: "", countryName: name, emoji: undefined } as CountryItem);
-        }
-
-        setCountryMap({ ...cacheRef.current });
-      } finally {
-        if (mounted) setCountryLoading(false);
-      }
-    };
-
-    load();
-
-    return () => {
-      mounted = false;
-    };
-  }, [visible, trip?.id]);
-
-  const countriesForView = useMemo(() => {
+  const countriesForView: CountryViewItem[] = useMemo(() => {
     if (!trip) return [];
-    const names = (trip.countries ?? []).map((c) => (c ?? "").trim()).filter(Boolean);
-    return names.map((name) => {
-      const item = countryMap[normalizeName(name)];
-      return item ?? ({ countryCode: "", countryName: name, emoji: undefined } as CountryItem);
-    });
-  }, [trip, countryMap]);
+
+    const visited =
+      (Array.isArray(t?.visitedCountries) && t.visitedCountries) ||
+      (Array.isArray(t?.visitedCountry) && t.visitedCountry) ||
+      (Array.isArray(t?.visited) && t.visited) ||
+      null;
+
+    if (visited && visited.length > 0) {
+      const mapped = visited
+        .map((c: any) => {
+          const code = normalizeCode(c?.countryCode ?? c?.code ?? c?.country_code);
+          const name =
+            normalizeName(c?.countryName ?? c?.name ?? c?.country_name) ??
+            code; 
+          const emoji =
+            normalizeName(c?.emoji) ?? (code ? flagEmojiFromCountryCode(code) : undefined);
+
+          if (!code && !name) return null;
+
+          return {
+            key: `${code ?? "NA"}-${name ?? "NA"}-${emoji ?? ""}`,
+            countryName: name ?? (code ?? ""),
+            emoji,
+          } as CountryViewItem;
+        })
+        .filter(Boolean) as CountryViewItem[];
+
+      if (mapped.length > 0) return mapped;
+    }
+
+    const codes =
+      (Array.isArray(t?.countryCodes) && t.countryCodes) ||
+      (Array.isArray(t?.visitedCountryCodes) && t.visitedCountryCodes) ||
+      (Array.isArray(t?.countriesCodes) && t.countriesCodes) ||
+      null;
+
+    if (codes && codes.length > 0) {
+      const mapped = codes
+        .map((raw: any) => normalizeCode(raw))
+        .filter(Boolean)
+        .map((cc: string) => ({
+          key: cc,
+          countryName: cc,
+          emoji: flagEmojiFromCountryCode(cc),
+        }));
+      if (mapped.length > 0) return mapped;
+    }
+
+    const names =
+      (Array.isArray(t?.countries) && t.countries) ||
+      (Array.isArray(t?.countryNames) && t.countryNames) ||
+      null;
+
+    if (names && names.length > 0) {
+      const mapped = names
+        .map((raw: any) => normalizeName(raw))
+        .filter(Boolean)
+        .map((nm: string) => ({
+          key: nm,
+          countryName: nm,
+          emoji: undefined,
+        }));
+      if (mapped.length > 0) return mapped;
+    }
+
+    return [];
+  }, [
+    trip,
+    t?.visitedCountries,
+    t?.visitedCountry,
+    t?.visited,
+    t?.countryCodes,
+    t?.visitedCountryCodes,
+    t?.countriesCodes,
+    t?.countries,
+    t?.countryNames,
+  ]);
 
   if (!trip) return null;
 
+  const handleArchive = () => {
+    if (!tripId) return;
+    onArchive(tripId);
+  };
+
+  const handleDelete = () => {
+    if (!tripId) return;
+    onDelete(tripId);
+  };
+
   return (
     <>
-      <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+      <Modal
+        transparent
+        animationType="fade"
+        presentationStyle="overFullScreen"
+        statusBarTranslucent
+        visible={visible}
+        onRequestClose={() => {
+          setOpenMenu(false);
+          onClose();
+        }}
+      >
         <View style={styles.backdrop}>
-          {/* 바깥 터치: 메뉴 열려있으면 메뉴만 닫고, 아니면 모달 닫기 */}
+
           <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={() => (openMenu ? setOpenMenu(false) : onClose())}
+            style={styles.backdropPress}
+            onPress={() => {
+              if (openMenu) setOpenMenu(false);
+              else onClose();
+            }}
           />
 
-          <Pressable style={styles.card} onPress={() => {}}>
-            {/* 헤더 */}
+          <View style={styles.card}>
             <View style={styles.header}>
               <Pressable
                 onPress={() => {
@@ -193,7 +275,7 @@ export default function TripDetailModal({
               </Pressable>
 
               <Text style={styles.title} numberOfLines={1}>
-                {trip.title}
+                {titleText}
               </Text>
 
               <Pressable
@@ -207,10 +289,9 @@ export default function TripDetailModal({
 
             <View style={styles.headerLine} />
 
-            {/* ✅ 메뉴 */}
             {openMenu && (
-              <>
-                {/* ❗중요: 이 오버레이가 메뉴를 덮지 않게 zIndex를 낮게 */}
+              <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+     
                 <Pressable
                   style={styles.menuOverlay}
                   onPress={() => setOpenMenu(false)}
@@ -221,7 +302,9 @@ export default function TripDetailModal({
                     style={styles.menuItem}
                     onPress={() => {
                       setOpenMenu(false);
-                      onEdit(trip);
+                      InteractionManager.runAfterInteractions(() => {
+                        onEdit(trip);
+                      });
                     }}
                   >
                     <Text style={styles.menuText}>수정하기</Text>
@@ -234,10 +317,20 @@ export default function TripDetailModal({
                     style={styles.menuItem}
                     onPress={() => {
                       setOpenMenu(false);
-                      setOpenArchiveConfirm(true);
+                      InteractionManager.runAfterInteractions(() => {
+                        setOpenArchiveConfirm(true);
+                      });
                     }}
+                    disabled={!tripId}
                   >
-                    <Text style={styles.menuText}>보관하기</Text>
+                    <Text
+                      style={[
+                        styles.menuText,
+                        !tripId && { color: Colors?.grey400 ?? "#A7A093" },
+                      ]}
+                    >
+                      보관하기
+                    </Text>
                     <ArchiveIcon width={22} height={22} />
                   </Pressable>
 
@@ -247,59 +340,66 @@ export default function TripDetailModal({
                     style={styles.menuItem}
                     onPress={() => {
                       setOpenMenu(false);
-                      setOpenDeleteConfirm(true);
+                      InteractionManager.runAfterInteractions(() => {
+                        setOpenDeleteConfirm(true);
+                      });
                     }}
+                    disabled={!tripId}
                   >
-                    <Text style={styles.menuTextDanger}>삭제하기</Text>
+                    <Text
+                      style={[
+                        styles.menuTextDanger,
+                        !tripId && { color: Colors?.grey400 ?? "#A7A093" },
+                      ]}
+                    >
+                      삭제하기
+                    </Text>
                     <DeleteIcon width={22} height={22} />
                   </Pressable>
                 </View>
-              </>
+              </View>
             )}
 
-            {/* 날짜 */}
-            <Text style={styles.date}>{dateText}</Text>
+            {!!dateText && <Text style={styles.date}>{dateText}</Text>}
 
-            {/* 설명 */}
-            {!!trip.note && (
+            {!!t?.description && (
               <Text style={styles.note} numberOfLines={3}>
-                {trip.note}
+                {String(t.description)}
               </Text>
             )}
 
-            {/* 국가 칩 (emoji 포함) */}
-            <View style={styles.chips}>
-              {countriesForView.map((c) => (
-                <View key={`${c.countryName}-${c.countryCode || "n"}`} style={styles.chip}>
-                  {!!c.emoji && <Text style={styles.chipEmoji}>{c.emoji}</Text>}
-                  <Text style={styles.chipText}>{c.countryName}</Text>
-                </View>
-              ))}
-            </View>
-
-            {countryLoading && (
-              <Text style={styles.loadingText}>국가 정보를 불러오는 중…</Text>
+            {countriesForView.length > 0 && (
+              <View style={styles.chips}>
+                {countriesForView.map((c) => (
+                  <View key={c.key} style={styles.chip}>
+                    {!!c.emoji && <Text style={styles.chipEmoji}>{c.emoji}</Text>}
+                    <Text style={styles.chipText}>{c.countryName}</Text>
+                  </View>
+                ))}
+              </View>
             )}
-          </Pressable>
+          </View>
         </View>
       </Modal>
 
-      {/* 보관 confirm */}
       <ConfirmDialog
         visible={openArchiveConfirm}
         title="해당 여행을 보관하시겠습니까?"
-        description={"여행을 보관하는 경우,\n해당 여행에 포함된 일기도 모두 보관전환됩니다."}
+        description={
+          "여행을 보관하는 경우,\n해당 여행에 포함된 일기도 모두 보관전환됩니다."
+        }
         confirmText="확인"
         cancelText="취소"
         onClose={() => setOpenArchiveConfirm(false)}
         onConfirm={() => {
           setOpenArchiveConfirm(false);
-          onArchive(trip.id);
-          setOpenArchivedDone(true);
+          handleArchive();
+          InteractionManager.runAfterInteractions(() => {
+            setOpenArchivedDone(true);
+          });
         }}
       />
 
-      {/* 보관 완료 */}
       <ConfirmDialog
         visible={openArchivedDone}
         title="보관되었습니다."
@@ -315,23 +415,25 @@ export default function TripDetailModal({
         }}
       />
 
-      {/* 삭제 confirm */}
       <ConfirmDialog
         visible={openDeleteConfirm}
         title="해당 여행을 삭제하시겠습니까?"
-        description={"삭제된 여행은 복구 불가능합니다.\n해당 여행에 포함된 일기도 모두 삭제됩니다."}
+        description={
+          "삭제된 여행은 복구 불가능합니다.\n해당 여행에 포함된 일기도 모두 삭제됩니다."
+        }
         confirmText="삭제"
         cancelText="취소"
         danger
         onClose={() => setOpenDeleteConfirm(false)}
         onConfirm={() => {
           setOpenDeleteConfirm(false);
-          onDelete(trip.id);
-          setOpenDeletedDone(true);
+          handleDelete();
+          InteractionManager.runAfterInteractions(() => {
+            setOpenDeletedDone(true);
+          });
         }}
       />
 
-      {/* 삭제 완료 */}
       <ConfirmDialog
         visible={openDeletedDone}
         title="삭제되었습니다."
@@ -357,6 +459,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
 
+  backdropPress: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+  },
+
   card: {
     width: 295,
     borderRadius: 24,
@@ -367,6 +474,8 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 18,
     position: "relative",
+    zIndex: 10,
+    elevation: 10,
   },
 
   header: {
@@ -402,8 +511,8 @@ const styles = StyleSheet.create({
   title: {
     ...typography.sub1_14_medium,
     color: TEXT_MAIN,
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: 20,
+    lineHeight: 24,
     textAlign: "center",
     paddingHorizontal: 32,
   },
@@ -414,13 +523,11 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 
-  // ✅ 메뉴 밖 터치 오버레이: 메뉴 아래로 깔기
   menuOverlay: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
+    zIndex: 20,
   },
 
-  // ✅ 메뉴: 오버레이보다 위로
   menu: {
     position: "absolute",
     right: 18,
@@ -431,8 +538,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors?.grey200 ?? "#E7E1D7",
     overflow: "hidden",
-    zIndex: 2,
-    elevation: 20,
+    zIndex: 30,
+    elevation: 30,
     shadowColor: "#000",
     shadowOpacity: 0.08,
     shadowRadius: 10,
@@ -453,14 +560,14 @@ const styles = StyleSheet.create({
   menuText: {
     ...typography.body4_14_regular,
     color: TEXT_MAIN,
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 17,
+    lineHeight: 21,
   },
   menuTextDanger: {
     ...typography.body4_14_regular,
     color: "#D13B3B",
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 17,
+    lineHeight: 21,
   },
 
   date: {
@@ -468,16 +575,16 @@ const styles = StyleSheet.create({
     color: TEXT_SUB,
     textAlign: "center",
     marginTop: 12,
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 17,
   },
 
   note: {
     ...typography.body4_14_regular,
     color: TEXT_MAIN,
     marginTop: 14,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 21,
   },
 
   chips: {
@@ -507,15 +614,7 @@ const styles = StyleSheet.create({
   chipText: {
     ...typography.sub2_12_regular,
     color: CHIP_TEXT,
-    fontSize: 13,
-    lineHeight: 16,
-  },
-
-  loadingText: {
-    marginTop: 12,
-    textAlign: "center",
-    ...typography.sub2_12_regular,
-    color: TEXT_SUB,
-    fontSize: 12,
+    fontSize: 14,
+    lineHeight: 17,
   },
 });

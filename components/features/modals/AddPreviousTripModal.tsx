@@ -19,10 +19,10 @@ import {
   View,
 } from "react-native";
 
-import { PreviousTrip, TripEmotion } from "../stack.types";
+import { useEmotions } from "@/hooks/useEmotions";
+import type { PreviousTrip, TripEmotion } from "../stack.types";
 
 type Mode = "create" | "edit";
-
 type Props = {
   visible: boolean;
   mode?: Mode;
@@ -47,10 +47,10 @@ function formatDateKR(d: Date) {
   return `${y}년 ${m}월 ${day}일 (${w})`;
 }
 
-function toCountryItems(names: string[]): CountryItem[] {
-  return names.map((name) => ({
-    countryCode: "", 
-    countryName: name,
+function toCountryItems(codes: string[]): CountryItem[] {
+  return codes.map((code) => ({
+    countryCode: code,
+    countryName: code,
   }));
 }
 
@@ -68,18 +68,22 @@ export default function AddPreviousTripModal({
 
   const [selectedCountries, setSelectedCountries] = useState<CountryItem[]>([]);
 
-  const [emotion, setEmotion] = useState<TripEmotion | undefined>(undefined);
+  const [emotionId, setEmotionId] = useState<number | null>(null);
   const [overlay, setOverlay] = useState<Overlay>(null);
 
   const scrollRef = useRef<ScrollView | null>(null);
 
+  const { findById } = useEmotions(visible);
+
+  const emotion: TripEmotion | undefined = useMemo(() => {
+    return findById(emotionId ?? undefined);
+  }, [findById, emotionId]);
+
   useEffect(() => {
     if (!visible) return;
 
-    setTitle(initial?.title ?? "");
-    setNote(initial?.note ?? "");
-    setEmotion(initial?.emotion);
-
+    setTitle(initial?.tripName ?? "");
+    setNote(initial?.description ?? "");
 
     if (mode === "edit" && initial?.startDate && initial?.endDate) {
       setStartDate(initial.startDate);
@@ -89,7 +93,9 @@ export default function AddPreviousTripModal({
       setEndDate(null);
     }
 
-    setSelectedCountries(toCountryItems(initial?.countries ?? []));
+    setSelectedCountries(toCountryItems(initial?.countryCodes ?? []));
+
+    setEmotionId(initial?.emotionId ?? null);
 
     setOverlay(null);
 
@@ -103,29 +109,36 @@ export default function AddPreviousTripModal({
     if (!t) return false;
     if (!startDate || !endDate) return false;
     if (endDate.getTime() < startDate.getTime()) return false;
-    if (selectedCountries.length === 0) return false;
-    if (!emotion) return false;
+
+    const codes = selectedCountries.map((c) => c.countryCode).filter(Boolean);
+    if (codes.length === 0) return false;
+
+    if (!emotionId) return false;
     return true;
-  }, [title, startDate, endDate, selectedCountries, emotion]);
+  }, [title, startDate, endDate, selectedCountries, emotionId]);
 
   const modalTitle = mode === "edit" ? "과거 여행 수정" : "과거 여행 추가";
 
   const submit = () => {
-    if (!canSave || !startDate || !endDate || !emotion) return;
+    if (!canSave || !startDate || !endDate || !emotionId) return;
 
-    const base: PreviousTrip = {
-      id: initial?.id ?? String(Date.now()),
-      title: title.trim(),
+    const payload: PreviousTrip = {
+      id: mode === "edit" ? initial?.id ?? 0 : 0,
+      tripName: title.trim(),
+      description: note.trim(),
       startDate,
       endDate,
-      note: note.trim(),
-      countries: selectedCountries.map((c) => c.countryName),
-      emotion,
-      createdAt: initial?.createdAt ?? new Date(),
+
+      countryCodes: selectedCountries.map((c) => c.countryCode).filter(Boolean),
+
+      emotionId,
       isArchived: initial?.isArchived ?? false,
+      representativeImageUrl: initial?.representativeImageUrl ?? null,
+      emotionName: initial?.emotionName,
+      emotionColor: initial?.emotionColor,
     };
 
-    onSubmit(base);
+    onSubmit(payload);
     onClose();
   };
 
@@ -232,7 +245,7 @@ export default function AddPreviousTripModal({
                 <Text style={styles.counterBelowBox}>({note.length}/54)</Text>
               </View>
 
-              {/* 여행한 국가들*/}
+              {/* 여행한 국가들 */}
               <View style={styles.fieldBlock}>
                 <Text style={styles.label}>여행한 국가들</Text>
 
@@ -307,7 +320,7 @@ export default function AddPreviousTripModal({
         value={emotion}
         onClose={() => setOverlay(null)}
         onConfirm={(e: TripEmotion) => {
-          setEmotion(e);
+          setEmotionId(e.id);
           setOverlay(null);
         }}
       />
@@ -478,6 +491,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   saveDisabled: { backgroundColor: Colors?.grey200 ?? "#E7E1D7" },
+
   saveText: { ...typography.sub1_14_medium, color: "#fff", fontSize: 18 },
   saveTextDisabled: { color: Colors?.grey400 ?? "#A7A093" },
 });

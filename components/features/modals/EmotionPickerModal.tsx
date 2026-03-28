@@ -1,33 +1,20 @@
 import CheckSvg from "@/assets/images/check.svg";
+import type { TripEmotion } from "@/components/features/stack.types";
+import { useEmotions } from "@/hooks/useEmotions";
 import { Colors } from "@/styles/colors";
 import { typography } from "@/styles/typography";
 import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { TripEmotion } from "../stack.types";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 type Props = {
   visible: boolean;
+
   value?: TripEmotion;
+
   onClose: () => void;
+
   onConfirm: (e: TripEmotion) => void;
 };
-
-const EMOTIONS: TripEmotion[] = [
-  { key: "excited", label: "설렘", color: "#F6C7CE" },
-  { key: "fresh", label: "신기함", color: "#F7C35C" },
-  { key: "happy", label: "즐거움", color: "#F2D44A" },
-  { key: "relax", label: "힐링", color: "#BFE6A6" },
-
-  { key: "calm", label: "평온", color: "#CFEAD7" },
-  { key: "proud", label: "뿌듯함", color: "#4FD1D9" },
-  { key: "free", label: "해방감", color: "#67B7E8" },
-  { key: "tired", label: "낯섦", color: "#6A5A86" },
-
-  { key: "tense", label: "긴장됨", color: "#2E3B4E" },
-  { key: "lonely", label: "외로움", color: "#A6A6A6" },
-  { key: "sad", label: "아쉬움", color: "#7A5C55" },
-  { key: "angry", label: "벅참", color: "#7B0018" },
-];
 
 const PRIMARY_400 = Colors?.primary400 ?? "#D8CCB8";
 const BTN_BROWN = Colors?.primary900 ?? "#544C3F";
@@ -39,6 +26,8 @@ export default function EmotionPickerOverlay({
   onClose,
   onConfirm,
 }: Props) {
+  const { emotions, loading, error } = useEmotions(visible);
+
   const [temp, setTemp] = useState<TripEmotion | undefined>(value);
 
   useEffect(() => {
@@ -66,33 +55,38 @@ export default function EmotionPickerOverlay({
 
         <View style={styles.dividerLine} />
 
-        <View style={styles.grid}>
-          {EMOTIONS.map((e) => {
-            const selected = temp?.key === e.key;
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator />
+          </View>
+        ) : error ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : (
+          <View style={styles.grid}>
+            {emotions.map((e) => {
+              const selected = temp?.id === e.id;
 
-            return (
-              <Pressable
-                key={e.key}
-                style={styles.item}
-                onPress={() => setTemp(e)}
-                hitSlop={8}
-              >
-                <View style={[styles.dot, { backgroundColor: e.color }]}>
-                  {selected && (
-                    <CheckSvg
-                      width={18}
-                      height={18}
-                    />
-                  )}
-                </View>
+              return (
+                <Pressable
+                  key={e.id}
+                  style={styles.item}
+                  onPress={() => setTemp(e)}
+                  hitSlop={8}
+                >
+                  <View style={[styles.dot, { backgroundColor: e.color }]}>
+                    {selected && <CheckSvg width={18} height={18} />}
+                  </View>
 
-                <Text style={[styles.label, selected && styles.labelSelected]}>
-                  {e.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+                  <Text style={[styles.label, selected && styles.labelSelected]}>
+                    {e.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
 
         <Pressable
           style={[styles.confirmBtn, !canConfirm && styles.confirmBtnDisabled]}
@@ -171,6 +165,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 18,
     marginBottom: 6,
   },
+
+  loadingBox: { paddingVertical: 22 },
+  errorBox: { paddingVertical: 18, paddingHorizontal: 18 },
+  errorText: { color: Colors?.grey700 ?? "#5b564d" },
 
   grid: {
     flexDirection: "row",

@@ -1,26 +1,33 @@
-// components/features/stack.types.ts
-export type TripEmotion = {
-  key: string;
-  label: string;
-  color: string; // ✅ 감정색(띠)
-};
+import { VisitedCountry } from "@/api/timeline";
 
 export type PreviousTrip = {
-  id: string;
-  title: string;
+  id: number;
+  tripName: string;
+  description: string;
   startDate: Date;
   endDate: Date;
-  note?: string;
-  countries: string[];
-  emotion?: TripEmotion;
-  createdAt: Date;
+
   isArchived?: boolean;
+  emotionId?: number;
+  emotionName?: string;
+  emotionColor?: string;
+
+  countryCodes?: string[];
+  visitedCountries?: VisitedCountry[];
+  representativeImageUrl?: string | null;
+};
+
+export type TripEmotion = {
+  id: number;
+  key: string;
+  label: string;
+  color: string;
 };
 
 export type StackCardItem = {
   id: string;
   title: string;
   dateText: string;
-  height: number;       // ✅ 62/70/...
-  emotionColor: string; // ✅ 띠에 적용할 색
+  height: number;
+  emotionColor: string;
 };

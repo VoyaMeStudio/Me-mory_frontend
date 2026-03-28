@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Dimensions, FlatList, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import {
+  Dimensions,
+  FlatList,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors } from "@/styles/colors";
@@ -12,20 +19,32 @@ import StackFab from "@/components/features/stack/StackFab";
 import AddPreviousTripModal from "@/components/features/modals/AddPreviousTripModal";
 import TripDetailModal from "@/components/features/modals/TripDetailModal";
 
-import { PreviousTrip } from "@/components/features/stack.types";
-import { diffDaysInclusive, tripToStackCardItem } from "@/components/features/stack.utils";
+import type { PreviousTrip } from "@/components/features/stack.types";
+import {
+  diffDaysInclusive,
+  formatDateYMD,
+  tripToStackCardItem,
+} from "@/components/features/stack.utils";
+
+import {
+  createPastTrip,
+  deletePastTrip,
+  getTimeline,
+  storePastTrip,
+  updatePastTrip,
+} from "@/api/timeline";
+
+import { getEmotions } from "@/api/emotions";
+import { timelineTripToPreviousTrip } from "@/components/features/stack/stack.adapter";
 
 export default function StackScreen() {
   const insets = useSafeAreaInsets();
 
   const [openAdd, setOpenAdd] = useState(false);
-
-  useEffect(() => {
-    console.log("[StackScreen] openAdd =", openAdd);
-  }, [openAdd]);
+  const [loading, setLoading] = useState(false);
 
   const [previousTrips, setPreviousTrips] = useState<PreviousTrip[]>([]);
-  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const [selectedTripId, setSelectedTripId] = useState<number | null>(null);
   const [editTrip, setEditTrip] = useState<PreviousTrip | null>(null);
 
   const { contentW } = useMemo(() => {
@@ -34,10 +53,28 @@ export default function StackScreen() {
     return { contentW: screenW - PADDING_H * 2 };
   }, []);
 
-  const activeTrips = useMemo(() => previousTrips.filter((t) => !t.isArchived), [previousTrips]);
+  const activeTrips = useMemo(
+    () => previousTrips.filter((t) => !t.isArchived),
+    [previousTrips]
+  );
+
+  useEffect(() => {
+    console.log(
+      "[StackScreen] previousTrips emotion:",
+      previousTrips.map((t) => ({
+        id: t.id,
+        emotionId: t.emotionId,
+        emotionName: t.emotionName,
+        emotionColor: t.emotionColor,
+        name: t.tripName,
+      }))
+    );
+  }, [previousTrips]);
 
   const stackItems = useMemo(() => {
-    const sorted = [...activeTrips].sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
+    const sorted = [...activeTrips].sort(
+      (a, b) => b.startDate.getTime() - a.startDate.getTime()
+    );
     return sorted.map(tripToStackCardItem);
   }, [activeTrips]);
 
@@ -47,12 +84,14 @@ export default function StackScreen() {
   }, [selectedTripId, previousTrips]);
 
   const totalDays = useMemo(() => {
-    return activeTrips.reduce((sum, t) => sum + diffDaysInclusive(t.startDate, t.endDate), 0);
+    return activeTrips.reduce(
+      (sum, t) => sum + diffDaysInclusive(t.startDate, t.endDate),
+      0
+    );
   }, [activeTrips]);
 
-  const CARD_GAP = 0;     
-  const Z_LAYER_BASE = 200; 
-
+  const CARD_GAP = 0;
+  const Z_LAYER_BASE = 200;
   const STACK_OFFSET = 60;
   const SHIFT_X = STACK_OFFSET / 2;
 
@@ -60,23 +99,145 @@ export default function StackScreen() {
   const TAB_SAFE_SPACE = 92;
   const fabBottom = insets.bottom + TAB_SAFE_SPACE + FAB_BOTTOM_GAP;
 
-  const upsertTrip = (trip: PreviousTrip) => {
-    setPreviousTrips((prev) => {
-      const idx = prev.findIndex((x) => x.id === trip.id);
-      if (idx === -1) return [trip, ...prev];
-      const next = [...prev];
-      next[idx] = trip;
-      return next;
-    });
-  };
+  async function refresh() {
+    setLoading(true);
+    try {
+      const resp = await getTimeline();
+      const tripsRaw = resp?.trips ?? [];
+      console.log(
+        "[StackScreen] tripsRaw[0]:",
+        JSON.stringify(tripsRaw?.[0], null, 2)
+      );
 
-  const archiveTrip = (id: string) => {
-    setPreviousTrips((prev) => prev.map((t) => (t.id === id ? { ...t, isArchived: true } : t)));
-  };
+      const emotions = await getEmotions();
 
-  const deleteTrip = (id: string) => {
-    setPreviousTrips((prev) => prev.filter((t) => t.id !== id));
+      const emotionByName = new Map(
+        emotions.map((e) => [String(e.name).trim(), e])
+      );
+
+      const trips: PreviousTrip[] = tripsRaw.map(timelineTripToPreviousTrip);
+
+      const normalized: PreviousTrip[] = trips.map((t) => {
+  const emotionName =
+    typeof t.emotionName === "string" ? t.emotionName.trim() : "";
+
+  const matched = emotionName ? emotionByName.get(emotionName) : undefined;
+
+  const nextEmotionId =
+    typeof t.emotionId === "number" && t.emotionId > 0
+      ? t.emotionId
+      : matched?.id ?? 0;
+
+  const rawColor =
+    typeof t.emotionColor === "string" ? t.emotionColor.trim() : "";
+
+  const isPlaceholderGrey = rawColor.toUpperCase() === "#EEEEEE";
+
+  const nextEmotionColor =
+    rawColor && !isPlaceholderGrey
+      ? rawColor
+      : matched?.colorCode ?? (rawColor || undefined);
+
+  return {
+    ...t,
+    emotionName: emotionName || t.emotionName,
+    emotionId: nextEmotionId,
+    emotionColor: nextEmotionColor,
   };
+});
+
+      setPreviousTrips(normalized);
+    } catch (e) {
+      console.log("[StackScreen] refresh error:", e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  async function handleCreate(form: PreviousTrip) {
+    setLoading(true);
+    try {
+
+      if (!form.emotionId || form.emotionId <= 0) {
+        console.log("[StackScreen] create blocked: invalid emotionId", form.emotionId);
+        return;
+      }
+
+      await createPastTrip({
+        tripName: form.tripName,
+        description: form.description,
+        startDate: formatDateYMD(form.startDate),
+        endDate: formatDateYMD(form.endDate),
+        countryCodes: form.countryCodes ?? [],
+        emotionId: form.emotionId,
+      });
+
+      setOpenAdd(false);
+      await refresh();
+    } catch (e) {
+      console.log("[StackScreen] createPastTrip error:", e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleUpdate(tripId: number, form: PreviousTrip) {
+    setLoading(true);
+    try {
+      if (!form.emotionId || form.emotionId <= 0) {
+        console.log("[StackScreen] update blocked: invalid emotionId", form.emotionId);
+        return;
+      }
+
+      await updatePastTrip(tripId, {
+        tripName: form.tripName,
+        description: form.description,
+        startDate: formatDateYMD(form.startDate),
+        endDate: formatDateYMD(form.endDate),
+        countryCodes: form.countryCodes ?? [],
+        emotionId: form.emotionId,
+      });
+
+      setEditTrip(null);
+      await refresh();
+    } catch (e) {
+      console.log("[StackScreen] updatePastTrip error:", e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDelete(tripId: number) {
+    setLoading(true);
+    try {
+      await deletePastTrip(tripId);
+      setSelectedTripId(null);
+      setPreviousTrips((prev) => prev.filter((t) => t.id !== tripId));
+    } catch (e) {
+      console.log("[StackScreen] deletePastTrip error:", e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleArchive(tripId: number) {
+    setLoading(true);
+    try {
+      await storePastTrip(tripId, true);
+      setSelectedTripId(null);
+      setPreviousTrips((prev) =>
+        prev.map((t) => (t.id === tripId ? { ...t, isArchived: true } : t))
+      );
+    } catch (e) {
+      console.log("[StackScreen] storePastTrip error:", e);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -87,15 +248,22 @@ export default function StackScreen() {
 
       <FlatList
         data={stackItems}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => String(item.id)}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.listContent, { paddingBottom: fabBottom + 90 }]}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: fabBottom + 90 },
+        ]}
         keyboardShouldPersistTaps="handled"
+        refreshing={loading}
+        onRefresh={refresh}
         ListHeaderComponent={
           <View style={styles.topWrap}>
             <GlobeIllust width={92} height={92} />
             <Text style={styles.summaryText}>
-              오늘까지 총 <Text style={styles.summaryStrong}>{totalDays}일</Text>을 여행 했습니다!
+              오늘까지 총{" "}
+              <Text style={styles.summaryStrong}>{totalDays}일</Text>을 여행
+              했습니다!
             </Text>
             <View style={{ height: 6 }} />
           </View>
@@ -119,7 +287,7 @@ export default function StackScreen() {
                 contentW={contentW}
                 side={isLeft ? "left" : "right"}
                 style={{ transform: [{ translateX: shiftX }] }}
-                onPress={() => setSelectedTripId(item.id)}
+                onPress={() => setSelectedTripId(Number(item.id))}
               />
             </View>
           );
@@ -128,12 +296,7 @@ export default function StackScreen() {
 
       <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
         <View style={[styles.fabWrap, { bottom: fabBottom }]}>
-          <StackFab
-            onPress={() => {
-              console.log("[StackScreen] FAB pressed");
-              setOpenAdd(true);
-            }}
-          />
+          <StackFab onPress={() => setOpenAdd(true)} />
         </View>
       </View>
 
@@ -141,7 +304,7 @@ export default function StackScreen() {
         visible={openAdd}
         mode="create"
         onClose={() => setOpenAdd(false)}
-        onSubmit={(trip) => upsertTrip(trip)}
+        onSubmit={handleCreate}
       />
 
       <AddPreviousTripModal
@@ -149,7 +312,10 @@ export default function StackScreen() {
         mode="edit"
         initial={editTrip ?? undefined}
         onClose={() => setEditTrip(null)}
-        onSubmit={(trip) => upsertTrip(trip)}
+        onSubmit={(form) => {
+          if (!editTrip) return;
+          handleUpdate(editTrip.id, form);
+        }}
       />
 
       <TripDetailModal
@@ -160,8 +326,8 @@ export default function StackScreen() {
           setSelectedTripId(null);
           requestAnimationFrame(() => setEditTrip(trip));
         }}
-        onArchive={(id) => archiveTrip(id)}
-        onDelete={(id) => deleteTrip(id)}
+        onArchive={(id) => handleArchive(id)}
+        onDelete={(id) => handleDelete(id)}
       />
     </SafeAreaView>
   );
@@ -169,19 +335,24 @@ export default function StackScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors?.primary50 ?? "#F7F5F0" },
-
-  paperBg: { ...StyleSheet.absoluteFillObject, backgroundColor: Colors?.primary50 ?? "#F7F5F0" },
-  paperOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "#FFFFFF", opacity: 0.18 },
-
-  listContent: { paddingTop: 12, paddingHorizontal: 24, paddingBottom: 24 },
-
-  topWrap: { alignItems: "center", marginTop: 8, marginBottom: 14, gap: 10 },
-
-  summaryText: { ...typography.body4_14_regular, color: Colors?.grey700 ?? "#6B665B" },
-  summaryStrong: { ...typography.sub1_14_medium, color: Colors?.grey900 ?? "#2E2A24" },
-
-  fabWrap: {
-    position: "absolute",
-    right: 24,
+  paperBg: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Colors?.primary50 ?? "#F7F5F0",
   },
+  paperOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#FFFFFF",
+    opacity: 0.18,
+  },
+  listContent: { paddingTop: 12, paddingHorizontal: 24, paddingBottom: 24 },
+  topWrap: { alignItems: "center", marginTop: 8, marginBottom: 14, gap: 10 },
+  summaryText: {
+    ...typography.body4_14_regular,
+    color: Colors?.grey700 ?? "#6B665B",
+  },
+  summaryStrong: {
+    ...typography.sub1_14_medium,
+    color: Colors?.grey900 ?? "#2E2A24",
+  },
+  fabWrap: { position: "absolute", right: 24 },
 });

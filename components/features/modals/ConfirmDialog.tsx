@@ -25,10 +25,25 @@ export default function ConfirmDialog({
   onConfirm,
 }: Props) {
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+    <Modal
+      transparent
+      animationType="fade"
+      visible={visible}
+      // ✅ iOS: 모달 겹침 경고 완화
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      {/* ✅ backdrop는 닫기만 담당 */}
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.card} onPress={() => {}}>
-          <Pressable style={styles.close} onPress={onClose}>
+        {/* ✅ 카드 영역 터치는 backdrop으로 버블링 안 되게 */}
+        <Pressable
+          style={styles.card}
+          onPress={(e) => {
+            e.stopPropagation?.();
+          }}
+        >
+          <Pressable style={styles.close} onPress={onClose} hitSlop={10}>
             <Text style={styles.closeText}>×</Text>
           </Pressable>
 
@@ -41,11 +56,11 @@ export default function ConfirmDialog({
             </Pressable>
 
             <Pressable
-              style={[
-                styles.btn,
-                danger ? styles.btnDanger : styles.btnPrimary,
-              ]}
-              onPress={onConfirm}
+              style={[styles.btn, danger ? styles.btnDanger : styles.btnPrimary]}
+              onPress={() => {
+                // ✅ 모달 닫힘/다음 모달 표시 타이밍 꼬임 줄이기
+                onConfirm();
+              }}
             >
               <Text style={styles.btnPrimaryText}>{confirmText}</Text>
             </Pressable>
