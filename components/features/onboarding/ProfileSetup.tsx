@@ -1,24 +1,26 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
+import React, { useMemo, useRef, useState } from "react";
 import {
-  Alert,
+  findNodeHandle,
   Image,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
+  UIManager,
   View,
-} from 'react-native';
-import DateTimePickerModal from 'react-native-modal-datetime-picker';
+} from "react-native";
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 
-import UploadIcon from '@/assets/images/Image.svg';
-import { Colors } from '@/styles/colors';
-import { typography } from '@/styles/typography';
+import { joinUser } from "@/api/user";
+import UploadIcon from "@/assets/images/Image.svg";
+import { Colors } from "@/styles/colors";
+import { typography } from "@/styles/typography";
 
 type FormState = {
   photoUri: string | null;
@@ -28,49 +30,25 @@ type FormState = {
   nameEnFirst: string;
 };
 
-type LocalProfile = {
-  photoUri: string | null;
-  nameKo: string;
-  birthDate: string | null; // YYYY-MM-DD
-  nameEnLast: string;
-  nameEnFirst: string;
-  updatedAt: number;
-};
-
-const PROFILE_KEY = 'local_profile_v1';
-
 export default function ProfileSetup() {
   const router = useRouter();
 
+  const scrollRef = useRef<ScrollView | null>(null);
+
+  const nameKoRef = useRef<View | null>(null);
+  const nameEnLastRef = useRef<View | null>(null);
+  const nameEnFirstRef = useRef<View | null>(null);
+
   const [form, setForm] = useState<FormState>({
     photoUri: null,
-    nameKo: '',
+    nameKo: "",
     birthDate: null,
-    nameEnLast: '',
-    nameEnFirst: '',
+    nameEnLast: "",
+    nameEnFirst: "",
   });
 
   const [isDateOpen, setIsDateOpen] = useState(false);
-  
-  useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(PROFILE_KEY);
-        if (!raw) return;
-        const saved = JSON.parse(raw) as LocalProfile;
-
-        setForm({
-          photoUri: saved.photoUri ?? null,
-          nameKo: saved.nameKo ?? '',
-          birthDate: saved.birthDate ? new Date(saved.birthDate) : null,
-          nameEnLast: saved.nameEnLast ?? '',
-          nameEnFirst: saved.nameEnFirst ?? '',
-        });
-      } catch {
-  
-      }
-    })();
-  }, []);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const filled = useMemo(() => {
     return (
@@ -83,18 +61,34 @@ export default function ProfileSetup() {
   }, [form]);
 
   const birthText = useMemo(() => {
-    if (!form.birthDate) return '생년월일을 입력해주세요.';
-    const d = form.birthDate;
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}년 ${mm}월 ${dd}일`;
+    if (!form.birthDate) return "생년월일을 입력해주세요.";
+    return formatBirthForDisplay(form.birthDate);
   }, [form.birthDate]);
+
+  const scrollToInput = (targetRef: React.RefObject<View | null>) => {
+    const scrollNode = findNodeHandle(scrollRef.current);
+    const targetNode = findNodeHandle(targetRef.current);
+
+    if (!scrollNode || !targetNode) return;
+
+    UIManager.measureLayout(
+      targetNode,
+      scrollNode,
+      () => {},
+      (_x, y) => {
+        scrollRef.current?.scrollTo({
+          y: Math.max(0, y - 120),
+          animated: true,
+        });
+      }
+    );
+  };
 
   const onPickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('권한 필요', '사진을 업로드하려면 갤러리 권한이 필요하다.');
+
+    if (status !== "granted") {
+      console.error("갤러리 권한이 거부되었다.");
       return;
     }
 
@@ -106,6 +100,7 @@ export default function ProfileSetup() {
     });
 
     if (res.canceled) return;
+
     const uri = res.assets?.[0]?.uri ?? null;
     setForm((prev) => ({ ...prev, photoUri: uri }));
   };
@@ -119,43 +114,49 @@ export default function ProfileSetup() {
     setForm((prev) => ({ ...prev, birthDate: date }));
   };
 
-  // 임시 로컬 저장
-  const saveLocalProfile = async () => {
-    const payload: LocalProfile = {
-      photoUri: form.photoUri,
-      nameKo: form.nameKo.trim(),
-      birthDate: form.birthDate ? form.birthDate.toISOString().slice(0, 10) : null,
-      nameEnLast: form.nameEnLast.trim(),
-      nameEnFirst: form.nameEnFirst.trim(),
-      updatedAt: Date.now(),
-    };
-
-    await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(payload));
-  };
-
-  const onSubmit = async () => {
-    if (!filled) return;
+const onSubmit = async () => {
+    if (!filled || isSubmitting || !form.birthDate) return;
 
     try {
-      await saveLocalProfile(); 
-      router.replace('/(tabs)');
-    } catch {
-      Alert.alert('저장 실패', '프로필 정보를 로컬에 저장하지 못했다.');
+      setIsSubmitting(true);
+
+      const payload = {
+        surName: form.nameEnLast.trim(),
+        firstName: form.nameEnFirst.trim(),
+        koreanName: form.nameKo.trim(),
+        birth: formatBirthForServer(form.birthDate),
+        nationality: "REPUBLIC OF KOREA",
+        alarm: true, 
+      };
+
+      console.log("회원가입 요청:", payload);
+
+      const res = await joinUser(payload);
+
+      console.log("회원가입 성공:", res);
+
+      router.replace("/(tabs)");
+    } catch (e: any) {
+      console.error("회원가입 실패:", e);
+      console.error("응답 상태:", e?.response?.status);
+      console.error("응답 데이터:", e?.response?.data);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.bg} />
-      <View style={styles.bgOverlay} />
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={styles.container}>
+        <View style={styles.bg} />
+        <View style={styles.bgOverlay} />
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          showsVerticalScrollIndicator={false}
         >
           <Text style={styles.title}>프로필을 입력해주세요!</Text>
 
@@ -177,7 +178,7 @@ export default function ProfileSetup() {
 
           <View style={styles.formWrap}>
             <View style={styles.row}>
-              <View style={styles.col}>
+              <View style={styles.col} ref={nameKoRef} collapsable={false}>
                 <Text style={styles.label}>한글 성명</Text>
                 <View style={styles.inputBox}>
                   <TextInput
@@ -186,13 +187,18 @@ export default function ProfileSetup() {
                     placeholder="한글 성명을 입력해주세요."
                     placeholderTextColor={Colors.grey500}
                     style={styles.input}
+                    returnKeyType="next"
+                    onFocus={() => scrollToInput(nameKoRef)}
                   />
                 </View>
               </View>
 
               <View style={styles.col}>
                 <Text style={styles.label}>생년 월일</Text>
-                <Pressable style={styles.dateBox} onPress={() => setIsDateOpen(true)}>
+                <Pressable
+                  style={styles.dateBox}
+                  onPress={() => setIsDateOpen(true)}
+                >
                   <Text
                     style={[
                       styles.dateText,
@@ -208,7 +214,7 @@ export default function ProfileSetup() {
             </View>
 
             <View style={styles.row}>
-              <View style={styles.col}>
+              <View style={styles.col} ref={nameEnLastRef} collapsable={false}>
                 <Text style={styles.label}>영문 성</Text>
                 <View style={styles.inputBox}>
                   <TextInput
@@ -220,11 +226,13 @@ export default function ProfileSetup() {
                     placeholderTextColor={Colors.grey500}
                     autoCapitalize="characters"
                     style={styles.input}
+                    returnKeyType="next"
+                    onFocus={() => scrollToInput(nameEnLastRef)}
                   />
                 </View>
               </View>
 
-              <View style={styles.col}>
+              <View style={styles.col} ref={nameEnFirstRef} collapsable={false}>
                 <Text style={styles.label}>영문 이름</Text>
                 <View style={styles.inputBox}>
                   <TextInput
@@ -232,17 +240,20 @@ export default function ProfileSetup() {
                     onChangeText={(t) =>
                       setForm((p) => ({ ...p, nameEnFirst: t.toUpperCase() }))
                     }
-                    placeholder="ex) JI YEON"
+                    placeholder="ex) JI HYE"
                     placeholderTextColor={Colors.grey500}
                     autoCapitalize="characters"
                     style={styles.input}
+                    returnKeyType="done"
+                    onFocus={() => scrollToInput(nameEnFirstRef)}
+                    onSubmitEditing={Keyboard.dismiss}
                   />
                 </View>
               </View>
             </View>
           </View>
 
-          <View style={{ height: 24 }} />
+          <View style={styles.scrollBottomSpace} />
         </ScrollView>
 
         <View style={styles.bottomWrap}>
@@ -250,9 +261,10 @@ export default function ProfileSetup() {
             style={[
               styles.startBtn,
               filled ? styles.startBtnEnabled : styles.startBtnDisabled,
+              isSubmitting && styles.startBtnSubmitting,
             ]}
             onPress={onSubmit}
-            disabled={!filled}
+            disabled={!filled || isSubmitting}
           >
             <Text
               style={[
@@ -260,30 +272,47 @@ export default function ProfileSetup() {
                 filled ? styles.startBtnTextEnabled : styles.startBtnTextDisabled,
               ]}
             >
-              시작하기
+              {isSubmitting ? "저장 중..." : "시작하기"}
             </Text>
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
 
-      <DateTimePickerModal
-        isVisible={isDateOpen}
-        mode="date"
-        onConfirm={onConfirmDate}
-        onCancel={() => setIsDateOpen(false)}
-        maximumDate={new Date()}
-      />
-    </View>
+        <DateTimePickerModal
+          isVisible={isDateOpen}
+          mode="date"
+          onConfirm={onConfirmDate}
+          onCancel={() => setIsDateOpen(false)}
+          maximumDate={new Date()}
+        />
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
 
+function formatBirthForDisplay(date: Date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}년 ${mm}월 ${dd}일`;
+}
+
+function formatBirthForServer(date: Date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flex: 1,
+  },
 
   bg: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#F3EFE6',
+    backgroundColor: "#F3EFE6",
   },
+
   bgOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: Colors.primary150,
@@ -293,22 +322,22 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 28,
     paddingTop: 96,
-    paddingBottom: 24,
-    alignItems: 'center',
+    paddingBottom: 0,
+    alignItems: "center",
   },
 
   title: {
     ...typography.head1_28_regular,
-    color: '#3B372F',
+    color: "#3B372F",
     letterSpacing: -0.2,
     marginBottom: 22,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 30,
   },
 
   photoWrap: {
-    width: '100%',
-    alignItems: 'center',
+    width: "100%",
+    alignItems: "center",
     marginBottom: 28,
   },
 
@@ -316,67 +345,69 @@ const styles = StyleSheet.create({
     width: 233,
     height: 300,
     borderRadius: 18,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: '#D8D2C8',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "#D8D2C8",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 10,
   },
 
   photoHint: {
     ...typography.body2_18_regular,
-    color: '#817F7C',
+    color: "#817F7C",
   },
 
   photoFilled: {
     width: 292,
     height: 292,
     borderRadius: 18,
-    overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
+    overflow: "hidden",
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: '#D8D2C8',
+    borderColor: "#D8D2C8",
   },
 
   photo: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
 
   photoRemoveBtn: {
-    position: 'absolute',
+    position: "absolute",
     top: 12,
     right: 12,
     width: 26,
     height: 26,
     borderRadius: 999,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   photoRemoveText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 18,
     lineHeight: 18,
-    fontWeight: '700',
+    fontWeight: "700",
     marginTop: -1,
   },
 
   formWrap: {
-    width: '100%',
+    width: "100%",
     marginTop: 2,
     gap: 22,
   },
 
   row: {
-    width: '100%',
-    flexDirection: 'row',
+    width: "100%",
+    flexDirection: "row",
     gap: 26,
   },
 
-  col: { flex: 1 },
+  col: {
+    flex: 1,
+  },
 
   label: {
     ...typography.head3_24_regular,
@@ -388,7 +419,7 @@ const styles = StyleSheet.create({
     height: 42,
     borderBottomWidth: 1,
     borderBottomColor: Colors.grey550,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
     paddingBottom: 4,
   },
 
@@ -396,33 +427,39 @@ const styles = StyleSheet.create({
     ...typography.body2_18_regular,
     paddingVertical: 0,
     color: Colors.primary950,
-    ...(Platform.OS === 'android' && { includeFontPadding: false }),
+    ...(Platform.OS === "android" && { includeFontPadding: false }),
   },
 
   dateBox: {
     height: 42,
     borderBottomWidth: 1,
     borderBottomColor: Colors.grey550,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
     paddingBottom: 4,
   },
 
   dateText: {
     ...typography.body2_18_regular,
     color: Colors.primary950,
-    ...(Platform.OS === 'android' && { includeFontPadding: false }),
+    ...(Platform.OS === "android" && { includeFontPadding: false }),
+  },
+
+  scrollBottomSpace: {
+    height: 220,
   },
 
   bottomWrap: {
     paddingHorizontal: 24,
-    paddingBottom: 26,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === "ios" ? 26 : 20,
+    backgroundColor: "transparent",
   },
 
   startBtn: {
     height: 60,
     borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   startBtnDisabled: {
@@ -436,10 +473,14 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
 
+  startBtnSubmitting: {
+    opacity: 0.7,
+  },
+
   startBtnTextBase: {
     ...typography.head3_24_regular,
     letterSpacing: -0.24,
-    textAlign: 'center',
+    textAlign: "center",
   },
 
   startBtnTextDisabled: {

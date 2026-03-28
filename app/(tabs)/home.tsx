@@ -1,4 +1,5 @@
 import { Colors } from "@/styles/colors";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,12 +15,15 @@ function EmptyView() {
 export default function IndexScreen() {
   const [tab, setTab] = useState<CollectionTabKey>("card");
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-  
-      <View style={{ paddingTop: 6}}>
-        <CollectionHeader title="모음" onPressProfile={() => {}} />
+      <View style={{ paddingTop: 6 }}>
+        <CollectionHeader
+          title="모음"
+          onPressProfile={() => router.push("/mypage")}
+        />
 
         <View style={styles.tabsWrap}>
           <CollectionTabs value={tab} onChange={setTab} />
@@ -27,11 +31,9 @@ export default function IndexScreen() {
       </View>
 
       <View style={styles.content}>
-
         {tab === "card" && <EmptyView />}
         {tab === "stack" && <StackScreen />}
         {tab === "timeline" && <EmptyView />}
-
       </View>
     </SafeAreaView>
   );
