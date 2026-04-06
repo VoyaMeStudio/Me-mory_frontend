@@ -31,7 +31,12 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen
               name="record"
-              options={{ presentation: 'fullScreenModal', title: '기록하기' }}
+              options={{
+                presentation: 'card',
+                headerShown: false,
+                title: '기록하기',
+                animation: 'slide_from_right',
+              }}
             />
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
           </Stack>

@@ -16,7 +16,7 @@ export default function TabLayout() {
 
   const handleTabPress = (tab: GnbTab) => {
     if (tab === 'record') {
-      // Push onto root stack so record opens as fullScreenModal (no bottom nav)
+      // Root-stack scene (sibling to tabs), not a tab route — hides GNB via navigation
       globalRouter.push('/record');
       return;
     }
