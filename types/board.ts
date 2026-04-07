@@ -58,3 +58,13 @@ export type StickerCatalogItem = {
   id: number;
   imageUrl: string;
 };
+
+export interface StickerData {
+  stickerId: number;
+  name: string;
+  imageUrl: string;
+}
+
+export interface GetStickersResponse {
+  stickers: StickerData[];
+}

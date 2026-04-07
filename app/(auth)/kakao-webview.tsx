@@ -1,9 +1,11 @@
 import { useAuth } from "@/context/authContext";
 import axiosInstance from "@/lib/axiosInstance";
+import { Colors } from "@/styles/colors";
+import { typography } from "@/styles/typography";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { WebView } from "react-native-webview";
 
 export default function KakaoWebView() {
@@ -32,6 +34,31 @@ export default function KakaoWebView() {
     );
   }, [REST_API_KEY, REDIRECT_URI]);
 
+  const routeAfterLogin = async () => {
+    try {
+      const res = await axiosInstance.get("/api/users/me");
+      console.log("로그인 후 /me 성공:", res.data);
+
+      router.replace("/(tabs)");
+    } catch (e: any) {
+      console.error("로그인 후 /me 실패:", e?.response?.data);
+
+      const message = e?.response?.data?.message ?? "";
+
+      if (message.includes("회원 정보 입력을 완료해주세요")) {
+        router.replace("/onboarding/profile-setup");
+        return;
+      }
+
+      setFatalError(
+        e?.response?.data?.message ??
+          e?.response?.data?.data?.message ??
+          e?.message ??
+          "로그인 후 사용자 정보 확인 중 오류가 발생했다."
+      );
+    }
+  };
+
   const handleCodeOnce = async (code: string) => {
     if (inflightRef.current) return;
     if (lastCodeRef.current === code) return;
@@ -55,8 +82,6 @@ export default function KakaoWebView() {
         res.data?.accessToken ??
         res.data?.jwtAccessToken;
 
-      const registered = res.data?.data?.registered ?? res.data?.registered;
-
       if (!tokenRaw) {
         setFatalError("서버 응답에 accessToken이 없음 (응답 스키마 확인 필요)");
         return;
@@ -66,8 +91,7 @@ export default function KakaoWebView() {
       await SecureStore.setItemAsync("access_token", token);
       await checkAuth();
 
-      if (registered) router.replace("/home");
-      else router.replace("/onboarding/profile-setup");
+      await routeAfterLogin();
     } catch (e: any) {
       console.log("[AUTH] FAIL:", {
         status: e?.response?.status,
@@ -101,45 +125,42 @@ export default function KakaoWebView() {
 
   if (!authUrl) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Text>환경변수(REST_API_KEY / REDIRECT_URI) 확인 필요</Text>
-        <Text style={{ marginTop: 8 }}>REST_API_KEY / REDIRECT_URI가 비어있음</Text>
+      <View style={styles.centerScreen}>
+        <Text style={styles.errorTitle}>환경변수 확인 필요</Text>
+        <Text style={styles.errorDesc}>
+          REST_API_KEY / REDIRECT_URI가 비어 있음
+        </Text>
       </View>
     );
   }
 
   if (fatalError) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          padding: 16,
-          gap: 12,
-        }}
-      >
-        <Text style={{ fontSize: 16, fontWeight: "600" }}>카카오 로그인 실패</Text>
-        <Text style={{ textAlign: "center" }}>{fatalError}</Text>
+      <View style={styles.centerScreen}>
+        <Text style={styles.errorTitle}>카카오 로그인 실패</Text>
+        <Text style={styles.errorDesc}>{fatalError}</Text>
 
-        <Pressable
-          onPress={resetAndReload}
-          style={{
-            marginTop: 12,
-            paddingVertical: 10,
-            paddingHorizontal: 14,
-            borderRadius: 10,
-            borderWidth: 1,
-          }}
-        >
-          <Text>다시 로그인하기</Text>
+        <Pressable onPress={resetAndReload} style={styles.retryButton}>
+          <Text style={styles.retryButtonText}>다시 로그인하기</Text>
         </Pressable>
       </View>
     );
   }
 
+  if (submitting) {
+    return (
+      <View style={styles.loadingScreen}>
+        <ActivityIndicator size="large" color={Colors.primary900} />
+        <Text style={styles.loadingTitle}>로그인 처리 중</Text>
+        <Text style={styles.loadingDesc}>
+          사용자 정보를 확인하고 있습니다.
+        </Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles.container}>
       <WebView
         ref={webviewRef}
         source={{ uri: authUrl }}
@@ -148,8 +169,9 @@ export default function KakaoWebView() {
         javaScriptEnabled
         startInLoadingState
         renderLoading={() => (
-          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-            <ActivityIndicator />
+          <View style={styles.loadingScreen}>
+            <ActivityIndicator size="large" color={Colors.primary900} />
+            <Text style={styles.loadingTitle}>카카오 로그인 화면 불러오는 중</Text>
           </View>
         )}
         onShouldStartLoadWithRequest={(req) => {
@@ -179,24 +201,73 @@ export default function KakaoWebView() {
         onHttpError={(e) => console.log("[WEBVIEW] http error", e.nativeEvent)}
         onError={(e) => console.log("[WEBVIEW] error", e.nativeEvent)}
       />
-
-      {submitting && (
-        <View
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            right: 0,
-            bottom: 0,
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "rgba(255,255,255,0.5)",
-          }}
-        >
-          <ActivityIndicator />
-          <Text style={{ marginTop: 10 }}>로그인 처리 중</Text>
-        </View>
-      )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.primary50,
+  },
+
+  centerScreen: {
+    flex: 1,
+    backgroundColor: Colors.primary50,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+
+  loadingScreen: {
+    flex: 1,
+    backgroundColor: Colors.primary50,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+
+  loadingTitle: {
+    ...typography.head3_24_regular,
+    color: Colors.primary950,
+    marginTop: 18,
+    textAlign: "center",
+  },
+
+  loadingDesc: {
+    ...typography.body4_14_regular,
+    color: Colors.grey700,
+    marginTop: 8,
+    textAlign: "center",
+  },
+
+  errorTitle: {
+    ...typography.head3_24_regular,
+    color: Colors.primary950,
+    marginBottom: 10,
+    textAlign: "center",
+  },
+
+  errorDesc: {
+    ...typography.body4_14_regular,
+    color: Colors.grey700,
+    textAlign: "center",
+    lineHeight: 22,
+  },
+
+  retryButton: {
+    marginTop: 20,
+    minWidth: 160,
+    height: 48,
+    borderRadius: 999,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primary900,
+  },
+
+  retryButtonText: {
+    ...typography.body2_18_regular,
+    color: Colors.primary50,
+  },
+});

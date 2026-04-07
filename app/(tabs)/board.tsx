@@ -12,6 +12,7 @@ import { STICKER_CATALOG_MOCK } from "@/constants/boardAssets";
 import useBoardEdit from "@/hooks/useBoardEdit";
 import useBoardList from "@/hooks/useBoardList";
 import { Colors } from "@/styles/colors";
+import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -25,6 +26,7 @@ import {
 type BoardScreenMode = "list" | "detail" | "edit";
 
 export default function BoardTabScreen() {
+  const router=useRouter();
   const { boards, isLoading, isCreating, handleCreateBoard, fetchBoards } =
     useBoardList();
 
@@ -130,7 +132,10 @@ export default function BoardTabScreen() {
         </View>
       );
     }
-    return <CollectionHeader title="보드" />;
+    return <CollectionHeader 
+    title="보드"
+    onPressProfile={()=>router.push("/mypage")}
+    />;
   };
 
   const renderDetailContent = () => {

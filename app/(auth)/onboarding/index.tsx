@@ -1,18 +1,41 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
-import { BackHandler, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, BackHandler, View } from 'react-native';
 
 import OnboardingStep1Screen from '@/components/features/onboarding/OnboardingStep1Screen';
 import OnboardingStep2Screen from '@/components/features/onboarding/OnboardingStep2Screen';
 import OnboardingStep3Screen from '@/components/features/onboarding/OnboardingStep3Screen';
 import OnboardingStep4Screen from '@/components/features/onboarding/OnboardingStep4Screen';
+import { useAuth } from '@/context/authContext';
 
 type Step = 1 | 2 | 3 | 4;
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { checkAuth } = useAuth();
+
   const [step, setStep] = useState<Step>(1);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const isLoggedIn = await checkAuth();
+
+        if (isLoggedIn) {
+          router.replace('/(tabs)');
+          return;
+        }
+      } catch (error) {
+        console.error('OnboardingScreen auth check error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    init();
+  }, [checkAuth, router]);
 
   const next = useCallback(() => {
     setStep((prev) => (prev < 4 ? ((prev + 1) as Step) : prev));
@@ -24,7 +47,7 @@ export default function OnboardingScreen() {
 
   const finish = useCallback(async () => {
     await AsyncStorage.setItem('hasOnboarded', 'true');
-  }, [router]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -38,6 +61,10 @@ export default function OnboardingScreen() {
       return () => sub.remove();
     }, [step, prev]),
   );
+
+  if (loading) {
+    return <View style={{ flex: 1 }}><ActivityIndicator /></View>;
+  }
 
   return (
     <View style={{ flex: 1 }}>
