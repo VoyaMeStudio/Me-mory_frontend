@@ -2,7 +2,7 @@ import OnboardingProgress from '@/components/features/onboarding/OnboardingProgr
 import { useAuth } from '@/context/authContext';
 import { Colors } from '@/styles/colors';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -36,7 +36,7 @@ export default function OnboardingStep4Screen({ onFinish }: Step4Props) {
   const { checkAuth } = useAuth();
   const BASE_INDEX = 3;
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const { gridW, cardW, cardH, innerW, innerH, gap } = useMemo(() => {
     const screenW = Dimensions.get('window').width;
@@ -54,10 +54,37 @@ export default function OnboardingStep4Screen({ onFinish }: Step4Props) {
     return { gridW, cardW, cardH, innerW, innerH, gap };
   }, []);
 
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const isLoggedIn = await checkAuth();
+
+        if (isLoggedIn) {
+          router.replace('/(tabs)');
+          return;
+        }
+      } catch (error) {
+        console.error('온보딩 Step4 auth check error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    init();
+  }, [checkAuth, router]);
+
   const handleKakaoStart = () => {
     if (loading) return;
     router.push('/(auth)/kakao-webview');
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.primary600} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -102,7 +129,6 @@ export default function OnboardingStep4Screen({ onFinish }: Step4Props) {
         >
           <KakaoIcon width={17} height={16} />
           <Text style={styles.kakaoButtonText}>카카오로 5초만에 시작하기</Text>
-          {loading && <ActivityIndicator style={{ marginLeft: 8 }} />}
         </Pressable>
       </View>
     </View>
@@ -111,6 +137,13 @@ export default function OnboardingStep4Screen({ onFinish }: Step4Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: Colors.primary150,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   bg: {
     ...StyleSheet.absoluteFillObject,

@@ -3,7 +3,8 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 
 type AuthContextValue = {
   isAuthed: boolean;
-  checkAuth: () => Promise<void>;
+  isReady: boolean;
+  checkAuth: () => Promise<boolean>;
   logout: () => Promise<void>;
 };
 
@@ -11,10 +12,19 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthed, setIsAuthed] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
-  const checkAuth = async () => {
-    const token = await SecureStore.getItemAsync("access_token");
-    setIsAuthed(!!token);
+  const checkAuth = async (): Promise<boolean> => {
+    try {
+      const token = await SecureStore.getItemAsync("access_token");
+      const authed = !!token;
+      setIsAuthed(authed);
+      return authed;
+    } catch (error) {
+      console.error("checkAuth error:", error);
+      setIsAuthed(false);
+      return false;
+    }
   };
 
   const logout = async () => {
@@ -23,10 +33,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    checkAuth();
+    const init = async () => {
+      try {
+        await checkAuth();
+      } finally {
+        setIsReady(true);
+      }
+    };
+
+    init();
   }, []);
 
-  const value = useMemo(() => ({ isAuthed, checkAuth, logout }), [isAuthed]);
+  const value = useMemo(
+    () => ({ isAuthed, isReady, checkAuth, logout }),
+    [isAuthed, isReady]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
