@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Platform,
   Pressable,
@@ -12,11 +12,30 @@ import {
 } from 'react-native';
 
 import {
+  getRecordReviewSession,
+  setRecordReviewSession,
+} from '@/lib/recordReviewSession';
+import {
   persistRepresentativeSlot,
   type RepresentativeSlot,
 } from '@/lib/recordRepresentativeStorage';
 import { Colors } from '@/styles/colors';
 import { typography } from '@/styles/typography';
+
+const RECORD_BG = require('@/assets/images/record_bg.jpg');
+
+function RecordScreenRoot({ children }: { children: React.ReactNode }) {
+  return (
+    <View style={{ flex: 1 }}>
+      <Image
+        source={RECORD_BG}
+        style={StyleSheet.absoluteFillObject}
+        contentFit="cover"
+      />
+      {children}
+    </View>
+  );
+}
 
 // expo-camera requires native code; load optionally so we don't crash in Expo Go
 let CameraView: any = null;
@@ -31,6 +50,26 @@ try {
 
 type CameraFacing = 'back' | 'front';
 type Step = 'capture' | 'review';
+
+function readReviewHydration() {
+  const s = getRecordReviewSession();
+  if (s?.mainUri && s?.selfieUri) {
+    return {
+      step: 'review' as Step,
+      mainUri: s.mainUri,
+      selfieUri: s.selfieUri,
+      topFacing: s.topFacing,
+      representativeSlot: s.representativeSlot,
+    };
+  }
+  return {
+    step: 'capture' as Step,
+    mainUri: null as string | null,
+    selfieUri: null as string | null,
+    topFacing: 'back' as CameraFacing,
+    representativeSlot: 'top' as RepresentativeSlot,
+  };
+}
 
 const COUNTDOWN_SECONDS = 15;
 
@@ -65,10 +104,18 @@ const RECORD_TOP_BG_IMAGE: number | null = null;
 function RecordScreenCameraUnavailable() {
   const router = useRouter();
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <RecordScreenRoot>
+      <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+          <Pressable
+            onPress={() => {
+              setRecordReviewSession(null);
+              router.back();
+            }}
+            style={styles.backBtn}
+            hitSlop={12}
+          >
             <Feather name="chevron-left" size={24} color={Colors.primary800} />
           </Pressable>
           <Text style={styles.title}>기록하기</Text>
@@ -81,7 +128,8 @@ function RecordScreenCameraUnavailable() {
           </Text>
         </View>
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </RecordScreenRoot>
   );
 }
 
@@ -96,16 +144,32 @@ function RecordScreenContent() {
 
   const [permission, requestPermission] = useCameraPermissions!();
   const [permissionCheckTimedOut, setPermissionCheckTimedOut] = useState(false);
-  const [step, setStep] = useState<Step>('capture');
-  const [topFacing, setTopFacing] = useState<CameraFacing>('back');
-  const [mainUri, setMainUri] = useState<string | null>(null);
-  const [selfieUri, setSelfieUri] = useState<string | null>(null);
+  const initial = useMemo(() => readReviewHydration(), []);
+  const [step, setStep] = useState<Step>(initial.step);
+  const [topFacing, setTopFacing] = useState<CameraFacing>(initial.topFacing);
+  const [mainUri, setMainUri] = useState<string | null>(initial.mainUri);
+  const [selfieUri, setSelfieUri] = useState<string | null>(initial.selfieUri);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [topCameraReady, setTopCameraReady] = useState(false);
   const [bottomCameraReady, setBottomCameraReady] = useState(false);
   /** Which image is marked 대표 in review (`top` = landscape/main shot, `bottom` = selfie). */
-  const [representativeSlot, setRepresentativeSlot] = useState<RepresentativeSlot>('top');
+  const [representativeSlot, setRepresentativeSlot] = useState<RepresentativeSlot>(
+    initial.representativeSlot
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const s = getRecordReviewSession();
+      if (s?.mainUri && s?.selfieUri) {
+        setStep('review');
+        setMainUri(s.mainUri);
+        setSelfieUri(s.selfieUri);
+        setTopFacing(s.topFacing);
+        setRepresentativeSlot(s.representativeSlot);
+      }
+    }, [])
+  );
 
   useEffect(() => {
     if (permission != null) return;
@@ -159,6 +223,8 @@ function RecordScreenContent() {
     if (uri) {
       clearCountdown();
       setSelfieUri(uri);
+      setRepresentativeSlot('top');
+      void persistRepresentativeSlot('top');
       setStep('review');
     }
   }, [mainUri, selfieUri, topCameraReady, bottomCameraReady, takePictureWithRef, clearCountdown]);
@@ -168,11 +234,13 @@ function RecordScreenContent() {
 
     if (countdown <= 0) {
       // Retry automatically until the bottom camera can actually capture.
-      (async () => {
+        (async () => {
         const uri = await takePictureWithRef(bottomCameraRef, bottomCameraReady);
         if (uri) {
           clearCountdown();
           setSelfieUri(uri);
+          setRepresentativeSlot('top');
+          void persistRepresentativeSlot('top');
           setStep('review');
           return;
         }
@@ -188,12 +256,6 @@ function RecordScreenContent() {
     return () => clearInterval(id);
   }, [mainUri, selfieUri, countdown, clearCountdown, bottomCameraReady, takePictureWithRef]);
 
-  useEffect(() => {
-    if (step !== 'review') return;
-    setRepresentativeSlot('top');
-    void persistRepresentativeSlot('top');
-  }, [step]);
-
   const onSelectRepresentative = useCallback((slot: RepresentativeSlot) => {
     setRepresentativeSlot(slot);
     void persistRepresentativeSlot(slot);
@@ -205,22 +267,37 @@ function RecordScreenContent() {
 
   const onRetake = useCallback(() => {
     clearCountdown();
+    setRecordReviewSession(null);
     setMainUri(null);
     setSelfieUri(null);
     setStep('capture');
   }, [clearCountdown]);
 
   const onNext = useCallback(() => {
+    if (mainUri && selfieUri) {
+      setRecordReviewSession({
+        mainUri,
+        selfieUri,
+        topFacing,
+        representativeSlot,
+      });
+    }
+    router.push('/record/destination');
+  }, [router, mainUri, selfieUri, topFacing, representativeSlot]);
+
+  const onHeaderBack = useCallback(() => {
+    setRecordReviewSession(null);
     router.back();
   }, [router]);
 
   if (!permission) {
     if (permissionCheckTimedOut) {
       return (
-        <SafeAreaView style={styles.safeArea}>
+        <RecordScreenRoot>
+          <SafeAreaView style={styles.safeArea}>
           <View style={styles.container}>
             <View style={styles.header}>
-              <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+              <Pressable onPress={onHeaderBack} style={styles.backBtn} hitSlop={12}>
                 <Feather name="chevron-left" size={24} color={Colors.primary800} />
               </Pressable>
               <Text style={styles.title}>기록하기</Text>
@@ -231,19 +308,21 @@ function RecordScreenContent() {
                 카메라 권한을 확인할 수 없습니다.{'\n'}
                 뒤로 가서 개발 빌드에서 다시 시도해 주세요.
               </Text>
-              <Pressable style={styles.permissionBtn} onPress={() => router.back()}>
+              <Pressable style={styles.permissionBtn} onPress={onHeaderBack}>
                 <Text style={styles.permissionBtnText}>뒤로 가기</Text>
               </Pressable>
             </View>
           </View>
-        </SafeAreaView>
+          </SafeAreaView>
+        </RecordScreenRoot>
       );
     }
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <RecordScreenRoot>
+        <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
           <View style={styles.header}>
-            <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+            <Pressable onPress={onHeaderBack} style={styles.backBtn} hitSlop={12}>
               <Feather name="chevron-left" size={24} color={Colors.primary800} />
             </Pressable>
             <Text style={styles.title}>기록하기</Text>
@@ -259,16 +338,18 @@ function RecordScreenContent() {
             </Pressable>
           </View>
         </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </RecordScreenRoot>
     );
   }
 
   if (!permission.granted) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <RecordScreenRoot>
+        <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
           <View style={styles.header}>
-            <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+            <Pressable onPress={onHeaderBack} style={styles.backBtn} hitSlop={12}>
               <Feather name="chevron-left" size={24} color={Colors.primary800} />
             </Pressable>
             <Text style={styles.title}>기록하기</Text>
@@ -281,15 +362,17 @@ function RecordScreenContent() {
             </Pressable>
           </View>
         </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </RecordScreenRoot>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <RecordScreenRoot>
+      <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+          <Pressable onPress={onHeaderBack} style={styles.backBtn} hitSlop={12}>
             <Feather name="chevron-left" size={24} color={Colors.primary800} />
           </Pressable>
           <Text style={styles.title}>기록하기</Text>
@@ -471,7 +554,8 @@ function RecordScreenContent() {
           </View>
         )}
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </RecordScreenRoot>
   );
 }
 
@@ -485,22 +569,24 @@ export default function RecordScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.primary100,
+    backgroundColor: 'transparent',
   },
   container: {
     flex: 1,
     paddingHorizontal: CONTAINER_H_PADDING,
   },
   header: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingTop: 8,
-    marginHorizontal: -4,
-    paddingHorizontal: 4,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.primary300,
+    gap: 3,
+    paddingTop: 10,
+    paddingBottom: 11,
+    paddingLeft: 12,
+    paddingRight: 12,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#CECBC6',
   },
   backBtn: {
     padding: 4,

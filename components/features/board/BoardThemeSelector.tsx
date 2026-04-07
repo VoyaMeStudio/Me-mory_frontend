@@ -25,6 +25,12 @@ const THEME_COMPONENT_MAP: Record<
 
 const THEME_IDS: BoardThemeId[] = [1, 2, 3, 4];
 
+const GAP = 12;
+
+/** Fixed tile: 100×116, aspect 25/29 — matches design spec */
+const TILE_WIDTH = 100;
+const TILE_HEIGHT = 116;
+
 export default function BoardThemeSelector({
   selectedThemeId,
   onSelect,
@@ -56,28 +62,41 @@ export default function BoardThemeSelector({
 }
 
 const styles = StyleSheet.create({
+  /** 3 columns × n rows, 12px between tiles; each tile 100×116 (25:29) */
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: 8,
+    columnGap: GAP,
+    rowGap: GAP,
+    alignSelf: "stretch",
+    justifyContent: "center",
   },
   item: {
-    width: "48.5%",
-    aspectRatio: 1,
-    borderRadius: 10,
+    width: TILE_WIDTH,
+    height: TILE_HEIGHT,
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 4,
+    paddingBottom: 4,
+    paddingLeft: 13,
+    paddingRight: 13,
+    gap: 10,
+    borderRadius: 20,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: Colors.primary200,
+    borderWidth: 1.6,
+    borderColor: Colors.grey700,
     backgroundColor: Colors.primary100,
   },
   itemSelected: {
-    borderWidth: 2,
+    borderWidth: 1.6,
     borderColor: "#D59B6A",
   },
   imageWrapper: {
     flex: 1,
+    alignSelf: "stretch",
     position: "relative",
+    minHeight: 0,
   },
   dimOverlay: {
     ...StyleSheet.absoluteFillObject,
