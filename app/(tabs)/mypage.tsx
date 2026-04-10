@@ -3,14 +3,14 @@ import PassportCard from "@/components/features/mypage/PassportCard";
 import VisitedCountriesDialog from "@/components/features/mypage/VisitedCountriesDialog";
 import useMypage from "@/hooks/useMypage";
 import { Colors } from "@/styles/colors";
-import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 export default function MypageScreen() {
@@ -22,6 +22,12 @@ export default function MypageScreen() {
     if (!mypage?.user?.koreanName) return "회원";
     return mypage.user.koreanName;
   }, [mypage]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   if (isLoading) {
     return (

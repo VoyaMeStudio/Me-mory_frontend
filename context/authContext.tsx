@@ -17,6 +17,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkAuth = async (): Promise<boolean> => {
     try {
       const token = await SecureStore.getItemAsync("access_token");
+      console.log("[Auth] access_token =", token);
+
       const authed = !!token;
       setIsAuthed(authed);
       return authed;
@@ -28,8 +30,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
-    await SecureStore.deleteItemAsync("access_token");
-    setIsAuthed(false);
+    try {
+      await SecureStore.deleteItemAsync("access_token");
+      await SecureStore.deleteItemAsync("refresh_token");
+    } catch (error) {
+      console.error("logout error:", error);
+    } finally {
+      setIsAuthed(false);
+    }
   };
 
   useEffect(() => {

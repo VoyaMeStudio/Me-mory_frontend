@@ -1,7 +1,9 @@
 import FrameSvg from "@/assets/images/frame.svg";
 import LogoSvg from "@/assets/images/Me-mory.svg";
 import SloganSvg from "@/assets/images/slogan.svg";
+import axiosInstance from "@/lib/axiosInstance";
 import { useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { useEffect, useMemo } from "react";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
 
@@ -13,10 +15,42 @@ export default function SplashScreen() {
   const { height } = useWindowDimensions();
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      router.replace("/(auth)/onboarding");
-    }, 1000);
-    return () => clearTimeout(t);
+    const bootstrap = async () => {
+      try {
+        const token = await SecureStore.getItemAsync("access_token");
+
+        console.log("[SPLASH] token:", token);
+
+        if (!token) {
+          router.replace("/(auth)/onboarding");
+          return;
+        }
+
+        await axiosInstance.get("/api/users/me");
+
+        router.replace("/(tabs)");
+      } catch (e: any) {
+        console.log("[SPLASH ERROR]", e?.response?.status);
+
+        if (e?.response?.status === 401) {
+          await SecureStore.deleteItemAsync("access_token");
+          await SecureStore.deleteItemAsync("refresh_token");
+
+          router.replace("/(auth)/onboarding");
+          return;
+        }
+
+        const message = e?.response?.data?.message ?? "";
+        if (message.includes("회원 정보 입력")) {
+          router.replace("/onboarding/profile-setup");
+          return;
+        }
+
+        router.replace("/(auth)/onboarding");
+      }
+    };
+
+    bootstrap();
   }, [router]);
 
   const { logoW, logoH, sloganW, sloganH } = useMemo(() => {
@@ -31,10 +65,8 @@ export default function SplashScreen() {
 
   const TOP = Math.round(height * 0.34);
 
-  const SLOGAN_GAP = 20; 
-
+  const SLOGAN_GAP = 20;
   const logoTop = Math.round((FRAME_H - logoH) / 2);
-
   const sloganTop = FRAME_H + SLOGAN_GAP;
 
   return (
@@ -83,19 +115,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F5F1E8",
   },
-
   anchor: {
     position: "absolute",
     left: "50%",
     transform: [{ translateX: -FRAME_W / 2 }],
   },
-
   frameBox: {
     width: FRAME_W,
     height: FRAME_H + 60,
     position: "relative",
   },
-
   abs: {
     position: "absolute",
   },
