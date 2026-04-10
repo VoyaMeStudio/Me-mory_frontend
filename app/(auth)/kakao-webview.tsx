@@ -54,7 +54,7 @@ export default function KakaoWebView() {
         e?.response?.data?.message ??
           e?.response?.data?.data?.message ??
           e?.message ??
-          "로그인 후 사용자 정보 확인 중 오류가 발생했다."
+          "로그인 후 사용자 정보 확인 중 오류가 발생했습니다."
       );
     }
   };
@@ -82,15 +82,28 @@ export default function KakaoWebView() {
         res.data?.accessToken ??
         res.data?.jwtAccessToken;
 
+      const refreshTokenRaw =
+        res.data?.data?.refreshToken ??
+        res.data?.refreshToken;
+
       if (!tokenRaw) {
         setFatalError("서버 응답에 accessToken이 없음 (응답 스키마 확인 필요)");
         return;
       }
 
       const token = String(tokenRaw).replace(/^Bearer\s+/i, "");
-      await SecureStore.setItemAsync("access_token", token);
-      await checkAuth();
+      console.log("[KAKAO] final access token:", token);
 
+      await SecureStore.setItemAsync("access_token", token);
+
+      if (refreshTokenRaw) {
+        await SecureStore.setItemAsync("refresh_token", String(refreshTokenRaw));
+        console.log("[KAKAO] refresh token saved");
+      } else {
+        console.log("[KAKAO] refresh token 없음");
+      }
+
+      await checkAuth();
       await routeAfterLogin();
     } catch (e: any) {
       console.log("[AUTH] FAIL:", {
@@ -113,11 +126,14 @@ export default function KakaoWebView() {
     }
   };
 
-  const resetAndReload = () => {
+  const resetAndReload = async () => {
     inflightRef.current = false;
     lastCodeRef.current = null;
     setFatalError(null);
     setSubmitting(false);
+
+    await SecureStore.deleteItemAsync("access_token");
+    await SecureStore.deleteItemAsync("refresh_token");
 
     webviewRef.current?.stopLoading?.();
     webviewRef.current?.reload();
@@ -168,12 +184,6 @@ export default function KakaoWebView() {
         cacheEnabled={false}
         javaScriptEnabled
         startInLoadingState
-        renderLoading={() => (
-          <View style={styles.loadingScreen}>
-            <ActivityIndicator size="large" color={Colors.primary900} />
-            <Text style={styles.loadingTitle}>카카오 로그인 화면 불러오는 중</Text>
-          </View>
-        )}
         onShouldStartLoadWithRequest={(req) => {
           const url = req.url;
 
@@ -187,8 +197,11 @@ export default function KakaoWebView() {
               const code = current.searchParams.get("code");
               console.log("[KAKAO] parsed code:", code);
 
-              if (code) handleCodeOnce(code);
-              else setFatalError("redirect URL에 code가 없음");
+              if (code) {
+                handleCodeOnce(code);
+              } else {
+                setFatalError("redirect URL에 code가 없음");
+              }
             } catch {
               setFatalError("redirect URL 파싱 실패");
             }

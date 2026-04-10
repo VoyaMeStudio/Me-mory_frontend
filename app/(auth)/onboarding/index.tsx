@@ -18,24 +18,26 @@ export default function OnboardingScreen() {
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const isLoggedIn = await checkAuth();
+useEffect(() => {
+  const init = async () => {
+    try {
+      const isLoggedIn = await checkAuth();
+      console.log("[OnboardingScreen] isLoggedIn =", isLoggedIn);
 
-        if (isLoggedIn) {
-          router.replace('/(tabs)');
-          return;
-        }
-      } catch (error) {
-        console.error('OnboardingScreen auth check error:', error);
-      } finally {
-        setLoading(false);
+      if (isLoggedIn) {
+        router.replace("/(tabs)");
+        return;
       }
-    };
+    } catch (error) {
+      console.error("OnboardingScreen auth check error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    init();
-  }, [checkAuth, router]);
+  init();
+}, [checkAuth, router]);
+  
 
   const next = useCallback(() => {
     setStep((prev) => (prev < 4 ? ((prev + 1) as Step) : prev));

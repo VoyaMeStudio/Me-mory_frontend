@@ -15,14 +15,17 @@ axiosInstance.interceptors.request.use(async (config) => {
 
   const isAuthRequest =
     url.startsWith("/api/auth/login/kakao") ||
-    url.startsWith("/api/auth") ||
-    url.startsWith("/auth");
+    url.startsWith("/auth/login/kakao");
 
   if (isAuthRequest) {
     delete (config.headers as any)?.Authorization;
   } else {
     const token = await SecureStore.getItemAsync("access_token");
-    if (token) (config.headers as any).Authorization = `Bearer ${token}`;
+    console.log("[AXIOS TOKEN]", token);
+
+    if (token) {
+      (config.headers as any).Authorization = `Bearer ${token}`;
+    }
   }
 
   const fullUrl = `${config.baseURL ?? ""}${config.url ?? ""}`;
@@ -40,7 +43,7 @@ axiosInstance.interceptors.request.use(async (config) => {
 
 axiosInstance.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     console.log("AXIOS ERROR", {
       status: error?.response?.status,
       data: error?.response?.data,
@@ -50,6 +53,13 @@ axiosInstance.interceptors.response.use(
       params: error?.config?.params,
       dataSent: error?.config?.data,
     });
+
+    if (error?.response?.status === 401) {
+      console.log("[AUTH] 401 발생 → 저장된 토큰 삭제");
+      await SecureStore.deleteItemAsync("access_token");
+      await SecureStore.deleteItemAsync("refresh_token");
+    }
+
     return Promise.reject(error);
   }
 );

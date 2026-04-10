@@ -1,7 +1,8 @@
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
-import React, { useMemo, useRef, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   findNodeHandle,
   Image,
   Keyboard,
@@ -19,6 +20,7 @@ import DateTimePickerModal from "react-native-modal-datetime-picker";
 
 import { joinUser } from "@/api/user";
 import UploadIcon from "@/assets/images/Image.svg";
+import axiosInstance from "@/lib/axiosInstance";
 import { Colors } from "@/styles/colors";
 import { typography } from "@/styles/typography";
 
@@ -32,6 +34,8 @@ type FormState = {
 
 export default function ProfileSetup() {
   const router = useRouter();
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const isEditMode = mode === "edit";
 
   const scrollRef = useRef<ScrollView | null>(null);
 
@@ -49,6 +53,7 @@ export default function ProfileSetup() {
 
   const [isDateOpen, setIsDateOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(isEditMode);
 
   const filled = useMemo(() => {
     return (
@@ -64,6 +69,38 @@ export default function ProfileSetup() {
     if (!form.birthDate) return "생년월일을 입력해주세요.";
     return formatBirthForDisplay(form.birthDate);
   }, [form.birthDate]);
+
+  useEffect(() => {
+    const fetchMyProfile = async () => {
+      if (!isEditMode) {
+        setIsLoadingProfile(false);
+        return;
+      }
+
+      try {
+        const res = await axiosInstance.get("/api/users/me");
+        const user = res?.data?.data?.user;
+
+        console.log("[PROFILE EDIT] /api/users/me user 응답:", user);
+
+        setForm({
+          photoUri: user?.profileImageUrl ?? null,
+          nameKo: user?.koreanName ?? "",
+          birthDate: parseServerBirth(user?.birth ?? null),
+          nameEnLast: user?.surName ?? "",
+          nameEnFirst: user?.firstName ?? "",
+        });
+      } catch (e: any) {
+        console.error("[PROFILE EDIT] 기존 정보 불러오기 실패:", e);
+        console.error("[PROFILE EDIT] 응답 상태:", e?.response?.status);
+        console.error("[PROFILE EDIT] 응답 데이터:", e?.response?.data);
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    fetchMyProfile();
+  }, [isEditMode]);
 
   const scrollToInput = (targetRef: React.RefObject<View | null>) => {
     const scrollNode = findNodeHandle(scrollRef.current);
@@ -114,7 +151,7 @@ export default function ProfileSetup() {
     setForm((prev) => ({ ...prev, birthDate: date }));
   };
 
-const onSubmit = async () => {
+  const onSubmit = async () => {
     if (!filled || isSubmitting || !form.birthDate) return;
 
     try {
@@ -126,24 +163,42 @@ const onSubmit = async () => {
         koreanName: form.nameKo.trim(),
         birth: formatBirthForServer(form.birthDate),
         nationality: "REPUBLIC OF KOREA",
-        alarm: true, 
+        alarm: true,
       };
+
+      if (isEditMode) {
+        console.log("회원정보 수정 요청:", payload);
+
+        const res = await axiosInstance.patch("/api/users/me", payload);
+
+        console.log("회원정보 수정 성공:", res?.data);
+        router.back();
+        return;
+      }
 
       console.log("회원가입 요청:", payload);
 
       const res = await joinUser(payload);
 
       console.log("회원가입 성공:", res);
-
       router.replace("/(tabs)");
     } catch (e: any) {
-      console.error("회원가입 실패:", e);
+      console.error(isEditMode ? "회원정보 수정 실패:" : "회원가입 실패:", e);
       console.error("응답 상태:", e?.response?.status);
       console.error("응답 데이터:", e?.response?.data);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoadingProfile) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.primary900} />
+        <Text style={styles.loadingText}>기존 정보를 불러오는 중...</Text>
+      </View>
+    );
+  }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -158,7 +213,9 @@ const onSubmit = async () => {
           keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.title}>프로필을 입력해주세요!</Text>
+          <Text style={styles.title}>
+            {isEditMode ? "프로필을 수정해주세요!" : "프로필을 입력해주세요!"}
+          </Text>
 
           <View style={styles.photoWrap}>
             {!form.photoUri ? (
@@ -272,7 +329,7 @@ const onSubmit = async () => {
                 filled ? styles.startBtnTextEnabled : styles.startBtnTextDisabled,
               ]}
             >
-              {isSubmitting ? "저장 중..." : "시작하기"}
+              {isSubmitting ? "저장 중..." : isEditMode ? "저장하기" : "시작하기"}
             </Text>
           </Pressable>
         </View>
@@ -303,9 +360,50 @@ function formatBirthForServer(date: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function parseServerBirth(value: string | null) {
+  if (!value) return null;
+
+  // 1) 일반적인 YYYY-MM-DD 대응
+  const normalDate = new Date(value);
+  if (!Number.isNaN(normalDate.getTime())) {
+    return normalDate;
+  }
+
+  // 2) 예: "22 2월/Feb 2002"
+  const match = value.match(/(\d{1,2})\s+\d+월\/[A-Za-z]+\s+(\d{4})/);
+
+  if (match) {
+    const day = Number(match[1]);
+    const year = Number(match[2]);
+
+    const monthMatch = value.match(/\s(\d{1,2})월\//);
+    const month = monthMatch ? Number(monthMatch[1]) : 1;
+
+    const parsed = new Date(year, month - 1, day);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: "#F3EFE6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  loadingText: {
+    ...typography.body2_18_regular,
+    color: Colors.primary950,
+    marginTop: 14,
   },
 
   bg: {
