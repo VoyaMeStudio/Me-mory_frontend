@@ -16,11 +16,10 @@ import {
 
 const MENU_ITEMS = [
   { label: "개인정보 수정", action: "edit_profile" as const },
-  { label: "보관된 여행 및 일기 관리", route: "/settings/archive" },
-  { label: "알림 설정", route: "/settings/notification" },
+  { label: "보관된 여행 및 일기 관리", route: "/(tabs)/settings/archive" },
+  { label: "알림 설정", route: "/(tabs)/settings/notification" },
   { label: "로그아웃", action: "logout" as const },
-  { label: "회원탈퇴", route: "/settings/withdraw" },
-  { label: "권한 설정", route: "/settings/permission" },
+  { label: "회원탈퇴", route: "/(tabs)/settings/withdraw" },
 ];
 
 export default function SettingsScreen() {
