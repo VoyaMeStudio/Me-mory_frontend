@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 
 import KakaoIcon from '@/assets/images/kakao.svg';
+import * as SecureStore from 'expo-secure-store';
 
 type Step4Props = {
   onFinish: () => void;
@@ -73,10 +74,14 @@ export default function OnboardingStep4Screen({ onFinish }: Step4Props) {
     init();
   }, [checkAuth, router]);
 
-  const handleKakaoStart = () => {
-    if (loading) return;
-    router.push('/(auth)/kakao-webview');
-  };
+ const handleKakaoStart = async () => {
+  if (loading) return;
+
+  await SecureStore.deleteItemAsync('access_token');
+  await SecureStore.deleteItemAsync('refresh_token');
+
+  router.push('/(auth)/kakao-webview');
+};
 
   if (loading) {
     return (

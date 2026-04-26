@@ -1,22 +1,25 @@
-import { useAuth } from "@/context/authContext";
 import axiosInstance from "@/lib/axiosInstance";
 import { Colors } from "@/styles/colors";
 import { typography } from "@/styles/typography";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { WebView } from "react-native-webview";
 
 export default function KakaoWebView() {
   const router = useRouter();
-  const { checkAuth } = useAuth();
 
   const REST_API_KEY = process.env.EXPO_PUBLIC_REST_API_KEY;
   const REDIRECT_URI = process.env.EXPO_PUBLIC_REDIRECT_URI;
 
   const webviewRef = useRef<WebView>(null);
-
   const inflightRef = useRef(false);
   const lastCodeRef = useRef<string | null>(null);
 
@@ -30,7 +33,8 @@ export default function KakaoWebView() {
       `https://kauth.kakao.com/oauth/authorize` +
       `?client_id=${encodeURIComponent(REST_API_KEY)}` +
       `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-      `&response_type=code`
+      `&response_type=code` +
+      `&prompt=login`
     );
   }, [REST_API_KEY, REDIRECT_URI]);
 
@@ -41,11 +45,18 @@ export default function KakaoWebView() {
 
       router.replace("/(tabs)");
     } catch (e: any) {
-      console.error("로그인 후 /me 실패:", e?.response?.data);
+      console.log("로그인 후 /me 실패:", e?.response?.data);
 
+      const status = e?.response?.status;
       const message = e?.response?.data?.message ?? "";
 
-      if (message.includes("회원 정보 입력을 완료해주세요")) {
+      const needsProfileSetup =
+        status === 400 &&
+        (message.includes("회원 정보 입력을 완료해주세요") ||
+          message.includes("회원정보 입력을 완료해주세요") ||
+          message.includes("회원 정보"));
+
+      if (needsProfileSetup) {
         router.replace("/onboarding/profile-setup");
         return;
       }
@@ -76,15 +87,17 @@ export default function KakaoWebView() {
 
       console.log("[KAKAO] backend response:", res?.data);
 
+      const data = res.data?.data;
+
       const tokenRaw =
-        res.data?.data?.accessToken ??
-        res.data?.data?.jwtAccessToken ??
+        data?.accessToken ??
+        data?.jwtAccessToken ??
         res.data?.accessToken ??
         res.data?.jwtAccessToken;
 
-      const refreshTokenRaw =
-        res.data?.data?.refreshToken ??
-        res.data?.refreshToken;
+      const refreshTokenRaw = data?.refreshToken ?? res.data?.refreshToken;
+
+      const registered = data?.registered;
 
       if (!tokenRaw) {
         setFatalError("서버 응답에 accessToken이 없음 (응답 스키마 확인 필요)");
@@ -93,17 +106,21 @@ export default function KakaoWebView() {
 
       const token = String(tokenRaw).replace(/^Bearer\s+/i, "");
       console.log("[KAKAO] final access token:", token);
+      console.log("[KAKAO] registered:", registered);
 
       await SecureStore.setItemAsync("access_token", token);
 
       if (refreshTokenRaw) {
         await SecureStore.setItemAsync("refresh_token", String(refreshTokenRaw));
-        console.log("[KAKAO] refresh token saved");
       } else {
-        console.log("[KAKAO] refresh token 없음");
+        await SecureStore.deleteItemAsync("refresh_token");
       }
 
-      await checkAuth();
+      if (registered === false) {
+        router.replace("/onboarding/profile-setup");
+        return;
+      }
+
       await routeAfterLogin();
     } catch (e: any) {
       console.log("[AUTH] FAIL:", {
@@ -182,20 +199,18 @@ export default function KakaoWebView() {
         source={{ uri: authUrl }}
         originWhitelist={["*"]}
         cacheEnabled={false}
+        incognito={true}
         javaScriptEnabled
         startInLoadingState
         onShouldStartLoadWithRequest={(req) => {
           const url = req.url;
 
           if (REDIRECT_URI && url.startsWith(REDIRECT_URI)) {
-            console.log("[KAKAO REDIRECT URL]", url);
-
             webviewRef.current?.stopLoading?.();
 
             try {
               const current = new URL(url);
               const code = current.searchParams.get("code");
-              console.log("[KAKAO] parsed code:", code);
 
               if (code) {
                 handleCodeOnce(code);

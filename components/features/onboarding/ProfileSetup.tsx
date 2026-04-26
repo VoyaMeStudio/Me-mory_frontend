@@ -1,9 +1,8 @@
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  findNodeHandle,
   Image,
   Keyboard,
   Platform,
@@ -13,13 +12,14 @@ import {
   Text,
   TextInput,
   TouchableWithoutFeedback,
-  UIManager,
   View,
 } from "react-native";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { joinUser } from "@/api/user";
 import UploadIcon from "@/assets/images/Image.svg";
+import BackIcon from "@/assets/images/back_button.svg";
 import axiosInstance from "@/lib/axiosInstance";
 import { Colors } from "@/styles/colors";
 import { typography } from "@/styles/typography";
@@ -36,12 +36,6 @@ export default function ProfileSetup() {
   const router = useRouter();
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const isEditMode = mode === "edit";
-
-  const scrollRef = useRef<ScrollView | null>(null);
-
-  const nameKoRef = useRef<View | null>(null);
-  const nameEnLastRef = useRef<View | null>(null);
-  const nameEnFirstRef = useRef<View | null>(null);
 
   const [form, setForm] = useState<FormState>({
     photoUri: null,
@@ -81,8 +75,6 @@ export default function ProfileSetup() {
         const res = await axiosInstance.get("/api/users/me");
         const user = res?.data?.data?.user;
 
-        console.log("[PROFILE EDIT] /api/users/me user 응답:", user);
-
         setForm({
           photoUri: user?.profileImageUrl ?? null,
           nameKo: user?.koreanName ?? "",
@@ -91,9 +83,9 @@ export default function ProfileSetup() {
           nameEnFirst: user?.firstName ?? "",
         });
       } catch (e: any) {
-        console.error("[PROFILE EDIT] 기존 정보 불러오기 실패:", e);
-        console.error("[PROFILE EDIT] 응답 상태:", e?.response?.status);
-        console.error("[PROFILE EDIT] 응답 데이터:", e?.response?.data);
+        console.log("[PROFILE EDIT] 기존 정보 불러오기 실패");
+        console.log("응답 상태:", e?.response?.status);
+        console.log("응답 데이터:", e?.response?.data);
       } finally {
         setIsLoadingProfile(false);
       }
@@ -102,30 +94,11 @@ export default function ProfileSetup() {
     fetchMyProfile();
   }, [isEditMode]);
 
-  const scrollToInput = (targetRef: React.RefObject<View | null>) => {
-    const scrollNode = findNodeHandle(scrollRef.current);
-    const targetNode = findNodeHandle(targetRef.current);
-
-    if (!scrollNode || !targetNode) return;
-
-    UIManager.measureLayout(
-      targetNode,
-      scrollNode,
-      () => {},
-      (_x, y) => {
-        scrollRef.current?.scrollTo({
-          y: Math.max(0, y - 120),
-          animated: true,
-        });
-      }
-    );
-  };
-
   const onPickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== "granted") {
-      console.error("갤러리 권한이 거부되었다.");
+      console.log("갤러리 권한이 거부되었다.");
       return;
     }
 
@@ -167,25 +140,17 @@ export default function ProfileSetup() {
       };
 
       if (isEditMode) {
-        console.log("회원정보 수정 요청:", payload);
-
-        const res = await axiosInstance.patch("/api/users/me", payload);
-
-        console.log("회원정보 수정 성공:", res?.data);
+        await axiosInstance.patch("/api/users/me", payload);
         router.back();
         return;
       }
 
-      console.log("회원가입 요청:", payload);
-
-      const res = await joinUser(payload);
-
-      console.log("회원가입 성공:", res);
+      await joinUser(payload);
       router.replace("/(tabs)");
     } catch (e: any) {
-      console.error(isEditMode ? "회원정보 수정 실패:" : "회원가입 실패:", e);
-      console.error("응답 상태:", e?.response?.status);
-      console.error("응답 데이터:", e?.response?.data);
+      console.log(isEditMode ? "회원정보 수정 실패" : "회원가입 실패");
+      console.log("응답 상태:", e?.response?.status);
+      console.log("응답 데이터:", e?.response?.data);
     } finally {
       setIsSubmitting(false);
     }
@@ -193,7 +158,7 @@ export default function ProfileSetup() {
 
   if (isLoadingProfile) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, styles.editBackground]}>
         <ActivityIndicator size="large" color={Colors.primary900} />
         <Text style={styles.loadingText}>기존 정보를 불러오는 중...</Text>
       </View>
@@ -201,148 +166,207 @@ export default function ProfileSetup() {
   }
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <View style={styles.container}>
-        <View style={styles.bg} />
-        <View style={styles.bgOverlay} />
-
-        <ScrollView
-          ref={scrollRef}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.title}>
-            {isEditMode ? "프로필을 수정해주세요!" : "프로필을 입력해주세요!"}
-          </Text>
-
-          <View style={styles.photoWrap}>
-            {!form.photoUri ? (
-              <Pressable style={styles.photoEmpty} onPress={onPickImage}>
-                <UploadIcon width={26} height={26} />
-                <Text style={styles.photoHint}>터치해서 사진 업로드</Text>
-              </Pressable>
-            ) : (
-              <View style={styles.photoFilled}>
-                <Image source={{ uri: form.photoUri }} style={styles.photo} />
-                <Pressable style={styles.photoRemoveBtn} onPress={onRemoveImage}>
-                  <Text style={styles.photoRemoveText}>×</Text>
-                </Pressable>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.formWrap}>
-            <View style={styles.row}>
-              <View style={styles.col} ref={nameKoRef} collapsable={false}>
-                <Text style={styles.label}>한글 성명</Text>
-                <View style={styles.inputBox}>
-                  <TextInput
-                    value={form.nameKo}
-                    onChangeText={(t) => setForm((p) => ({ ...p, nameKo: t }))}
-                    placeholder="한글 성명을 입력해주세요."
-                    placeholderTextColor={Colors.grey500}
-                    style={styles.input}
-                    returnKeyType="next"
-                    onFocus={() => scrollToInput(nameKoRef)}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.col}>
-                <Text style={styles.label}>생년 월일</Text>
-                <Pressable
-                  style={styles.dateBox}
-                  onPress={() => setIsDateOpen(true)}
-                >
-                  <Text
-                    style={[
-                      styles.dateText,
-                      !form.birthDate && { color: Colors.grey500 },
-                    ]}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    {birthText}
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-
-            <View style={styles.row}>
-              <View style={styles.col} ref={nameEnLastRef} collapsable={false}>
-                <Text style={styles.label}>영문 성</Text>
-                <View style={styles.inputBox}>
-                  <TextInput
-                    value={form.nameEnLast}
-                    onChangeText={(t) =>
-                      setForm((p) => ({ ...p, nameEnLast: t.toUpperCase() }))
-                    }
-                    placeholder="ex) KIM"
-                    placeholderTextColor={Colors.grey500}
-                    autoCapitalize="characters"
-                    style={styles.input}
-                    returnKeyType="next"
-                    onFocus={() => scrollToInput(nameEnLastRef)}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.col} ref={nameEnFirstRef} collapsable={false}>
-                <Text style={styles.label}>영문 이름</Text>
-                <View style={styles.inputBox}>
-                  <TextInput
-                    value={form.nameEnFirst}
-                    onChangeText={(t) =>
-                      setForm((p) => ({ ...p, nameEnFirst: t.toUpperCase() }))
-                    }
-                    placeholder="ex) JI HYE"
-                    placeholderTextColor={Colors.grey500}
-                    autoCapitalize="characters"
-                    style={styles.input}
-                    returnKeyType="done"
-                    onFocus={() => scrollToInput(nameEnFirstRef)}
-                    onSubmitEditing={Keyboard.dismiss}
-                  />
-                </View>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.scrollBottomSpace} />
-        </ScrollView>
-
-        <View style={styles.bottomWrap}>
-          <Pressable
+    <SafeAreaView
+      style={[
+        styles.safeArea,
+        isEditMode ? styles.editBackground : styles.signupBackground,
+      ]}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.container}>
+          <View
             style={[
-              styles.startBtn,
-              filled ? styles.startBtnEnabled : styles.startBtnDisabled,
-              isSubmitting && styles.startBtnSubmitting,
+              styles.bg,
+              isEditMode ? styles.editBackground : styles.signupBackground,
             ]}
-            onPress={onSubmit}
-            disabled={!filled || isSubmitting}
+          />
+
+          {!isEditMode && (
+            <Image
+              source={require("@/assets/images/route4.png")}
+              style={styles.routeBg}
+              resizeMode="contain"
+            />
+          )}
+
+          <ScrollView
+            contentContainerStyle={[
+              styles.scrollContent,
+              isEditMode ? styles.editScrollContent : styles.signupScrollContent,
+            ]}
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="none"
+            automaticallyAdjustKeyboardInsets={false}
+            showsVerticalScrollIndicator={false}
           >
-            <Text
+            {isEditMode ? (
+              <View style={styles.header}>
+                <Pressable style={styles.backBtn} onPress={() => router.back()}>
+                  <BackIcon width={28} height={28} />
+                </Pressable>
+                <Text style={styles.headerTitle}>설정</Text>
+              </View>
+            ) : (
+              <Text style={styles.title}>프로필을 입력해주세요!</Text>
+            )}
+
+            <View
               style={[
-                styles.startBtnTextBase,
-                filled ? styles.startBtnTextEnabled : styles.startBtnTextDisabled,
+                styles.photoWrap,
+                isEditMode ? styles.editPhotoWrap : styles.signupPhotoWrap,
               ]}
             >
-              {isSubmitting ? "저장 중..." : isEditMode ? "저장하기" : "시작하기"}
-            </Text>
-          </Pressable>
-        </View>
+              {!form.photoUri ? (
+                <Pressable
+                  style={[
+                    styles.photoEmpty,
+                    isEditMode ? styles.editPhotoEmpty : styles.signupPhotoEmpty,
+                  ]}
+                  onPress={onPickImage}
+                >
+                  <UploadIcon width={26} height={26} />
+                  <Text style={styles.photoHint}>터치해서 사진 업로드</Text>
+                </Pressable>
+              ) : (
+                <View
+                  style={[
+                    styles.photoFilled,
+                    isEditMode
+                      ? styles.editPhotoFilled
+                      : styles.signupPhotoFilled,
+                  ]}
+                >
+                  <Image source={{ uri: form.photoUri }} style={styles.photo} />
+                  <Pressable style={styles.photoRemoveBtn} onPress={onRemoveImage}>
+                    <Text style={styles.photoRemoveText}>×</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
 
-        <DateTimePickerModal
-          isVisible={isDateOpen}
-          mode="date"
-          onConfirm={onConfirmDate}
-          onCancel={() => setIsDateOpen(false)}
-          maximumDate={new Date()}
-        />
-      </View>
-    </TouchableWithoutFeedback>
+            <View
+              style={[
+                styles.formWrap,
+                isEditMode ? styles.editFormWrap : styles.signupFormWrap,
+              ]}
+            >
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={styles.label}>한글 성명</Text>
+                  <View style={styles.inputBox}>
+                    <TextInput
+                      value={form.nameKo}
+                      onChangeText={(t) =>
+                        setForm((p) => ({ ...p, nameKo: t }))
+                      }
+                      placeholder="한글 성명을 입력해주세요."
+                      placeholderTextColor={Colors.grey500}
+                      style={styles.input}
+                      returnKeyType="next"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.col}>
+                  <Text style={styles.label}>생년 월일</Text>
+                  <Pressable
+                    style={styles.dateBox}
+                    onPress={() => setIsDateOpen(true)}
+                  >
+                    <Text
+                      style={[
+                        styles.dateText,
+                        !form.birthDate && { color: Colors.grey500 },
+                      ]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {birthText}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={styles.label}>영문 성</Text>
+                  <View style={styles.inputBox}>
+                    <TextInput
+                      value={form.nameEnLast}
+                      onChangeText={(t) =>
+                        setForm((p) => ({
+                          ...p,
+                          nameEnLast: t.toUpperCase(),
+                        }))
+                      }
+                      placeholder="ex) KIM"
+                      placeholderTextColor={Colors.grey500}
+                      autoCapitalize="characters"
+                      style={styles.input}
+                      returnKeyType="next"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.col}>
+                  <Text style={styles.label}>영문 이름</Text>
+                  <View style={styles.inputBox}>
+                    <TextInput
+                      value={form.nameEnFirst}
+                      onChangeText={(t) =>
+                        setForm((p) => ({
+                          ...p,
+                          nameEnFirst: t.toUpperCase(),
+                        }))
+                      }
+                      placeholder="ex) JI HYE"
+                      placeholderTextColor={Colors.grey500}
+                      autoCapitalize="characters"
+                      style={styles.input}
+                      returnKeyType="done"
+                      onSubmitEditing={Keyboard.dismiss}
+                    />
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.scrollBottomSpace} />
+          </ScrollView>
+
+          <View style={styles.bottomWrap}>
+            <Pressable
+              style={[
+                styles.startBtn,
+                filled ? styles.startBtnEnabled : styles.startBtnDisabled,
+                isSubmitting && styles.startBtnSubmitting,
+              ]}
+              onPress={onSubmit}
+              disabled={!filled || isSubmitting}
+            >
+              <Text
+                style={[
+                  styles.startBtnTextBase,
+                  filled
+                    ? styles.startBtnTextEnabled
+                    : styles.startBtnTextDisabled,
+                ]}
+              >
+                {isSubmitting ? "저장 중..." : isEditMode ? "저장하기" : "시작하기"}
+              </Text>
+            </Pressable>
+          </View>
+
+          <DateTimePickerModal
+            isVisible={isDateOpen}
+            mode="date"
+            onConfirm={onConfirmDate}
+            onCancel={() => setIsDateOpen(false)}
+            maximumDate={new Date()}
+          />
+        </View>
+      </TouchableWithoutFeedback>
+    </SafeAreaView>
   );
 }
 
@@ -363,13 +387,11 @@ function formatBirthForServer(date: Date) {
 function parseServerBirth(value: string | null) {
   if (!value) return null;
 
-  // 1) 일반적인 YYYY-MM-DD 대응
   const normalDate = new Date(value);
   if (!Number.isNaN(normalDate.getTime())) {
     return normalDate;
   }
 
-  // 2) 예: "22 2월/Feb 2002"
   const match = value.match(/(\d{1,2})\s+\d+월\/[A-Za-z]+\s+(\d{4})/);
 
   if (match) {
@@ -389,45 +411,82 @@ function parseServerBirth(value: string | null) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  safeArea: { flex: 1 },
+  container: { flex: 1 },
+
+  bg: {
+    ...StyleSheet.absoluteFillObject,
+  },
+
+  signupBackground: {
+    backgroundColor: "#F6F1E9",
+  },
+
+  editBackground: {
+    backgroundColor: Colors.primary50,
+  },
+
+  routeBg: {
+    position: "absolute",
+    width: "120%",
+    height: "78%",
+    left: "-10%",
+    top: 210,
+    opacity: 0.8,
   },
 
   loadingContainer: {
     flex: 1,
-    backgroundColor: "#F3EFE6",
     alignItems: "center",
     justifyContent: "center",
   },
 
   loadingText: {
     ...typography.body2_18_regular,
-    color: Colors.primary950,
+    color: Colors.primary900,
     marginTop: 14,
-  },
-
-  bg: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#F3EFE6",
-  },
-
-  bgOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors.primary150,
-    opacity: 0.12,
   },
 
   scrollContent: {
     paddingHorizontal: 28,
-    paddingTop: 96,
     paddingBottom: 0,
     alignItems: "center",
+  },
+
+  signupScrollContent: {
+    paddingTop: 20,
+  },
+
+  editScrollContent: {
+    paddingTop: 14,
+  },
+
+  header: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 28,
+  },
+
+  backBtn: {
+    width: 36,
+    height: 36,
+    alignItems: "flex-start",
+    justifyContent: "center",
+  },
+
+  headerTitle: {
+    ...typography.head3_24_regular,
+    color: "#161616",
+    fontSize: 26,
+    marginLeft: 2,
   },
 
   title: {
     ...typography.head1_28_regular,
     color: "#3B372F",
     letterSpacing: -0.2,
+    marginTop: 6,
     marginBottom: 22,
     textAlign: "center",
     lineHeight: 30,
@@ -436,12 +495,17 @@ const styles = StyleSheet.create({
   photoWrap: {
     width: "100%",
     alignItems: "center",
+  },
+
+  signupPhotoWrap: {
+    marginBottom: 28,
+  },
+
+  editPhotoWrap: {
     marginBottom: 28,
   },
 
   photoEmpty: {
-    width: 233,
-    height: 300,
     borderRadius: 18,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
@@ -451,19 +515,37 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 
+  signupPhotoEmpty: {
+    width: 233,
+    height: 300,
+  },
+
+  editPhotoEmpty: {
+    width: 292,
+    height: 292,
+  },
+
   photoHint: {
     ...typography.body2_18_regular,
     color: "#817F7C",
   },
 
   photoFilled: {
-    width: 292,
-    height: 292,
     borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#D8D2C8",
+  },
+
+  signupPhotoFilled: {
+    width: 233,
+    height: 300,
+  },
+
+  editPhotoFilled: {
+    width: 292,
+    height: 292,
   },
 
   photo: {
@@ -493,8 +575,15 @@ const styles = StyleSheet.create({
 
   formWrap: {
     width: "100%",
-    marginTop: 2,
     gap: 22,
+  },
+
+  signupFormWrap: {
+    marginTop: 2,
+  },
+
+  editFormWrap: {
+    marginTop: 2,
   },
 
   row: {
